@@ -7,19 +7,18 @@ import notificationSound from "../assets/sounds/notification.mp3";
 
 const useListenMessages = () => {
   const { socket } = useSocketContext();
-  const {
-    messages,
-    setMessages,
-    selectedConversation,
-    conversations,
-    setConversations,
-    unreadCounts,
-    setUnreadCounts,
-  } = useConversation();
 
   useEffect(() => {
+    if (!socket) return;
+
     const handleNewMessage = (newMessage) => {
-      const isFromActive = newMessage.senderId === selectedConversation?._id;
+      const state = useConversation.getState();
+      const currentMessages = state.messages;
+      const activeConv = state.selectedConversation;
+      const currentConvs = state.conversations;
+      const currentUnreads = state.unreadCounts;
+
+      const isFromActive = newMessage.senderId === activeConv?._id;
 
       // Play notification sound
       const sound = new Audio(notificationSound);
@@ -27,38 +26,53 @@ const useListenMessages = () => {
 
       if (isFromActive) {
         newMessage.shouldShake = true;
-        setMessages([...messages, newMessage]);
+        newMessage.status = "read";
+        state.setMessages([...currentMessages, newMessage]);
+        socket?.emit("messageRead", { messageId: newMessage._id, senderId: newMessage.senderId });
       } else {
         const senderId = newMessage.senderId;
-        const currentCount = unreadCounts[senderId] || 0;
-        setUnreadCounts({
-          ...unreadCounts,
+        const currentCount = currentUnreads[senderId] || 0;
+        state.setUnreadCounts({
+          ...currentUnreads,
           [senderId]: currentCount + 1,
         });
+        socket?.emit("messageDelivered", { messageId: newMessage._id, senderId: newMessage.senderId });
       }
 
       // Move the conversation with the latest incoming message to the top
-      const matchedConv = conversations.find((c) => c._id === newMessage.senderId);
+      const matchedConv = currentConvs.find((c) => c._id === newMessage.senderId);
       if (matchedConv) {
-        const remainingConvs = conversations.filter((c) => c._id !== newMessage.senderId);
-        setConversations([matchedConv, ...remainingConvs]);
+        const remainingConvs = currentConvs.filter((c) => c._id !== newMessage.senderId);
+        state.setConversations([matchedConv, ...remainingConvs]);
       }
     };
 
+    const handleStatusUpdate = ({ messageId, status }) => {
+      const state = useConversation.getState();
+      state.setMessages(state.messages.map((m) => (m._id === messageId ? { ...m, status } : m)));
+    };
+
+    const handleMessagesDelivered = ({ receiverId }) => {
+      const state = useConversation.getState();
+      state.setMessages(state.messages.map((m) => (m.receiverId === receiverId ? { ...m, status: "delivered" } : m)));
+    };
+
+    const handleConversationRead = ({ readerId }) => {
+      const state = useConversation.getState();
+      state.setMessages(state.messages.map((m) => (m.receiverId === readerId ? { ...m, status: "read" } : m)));
+    };
+
     socket?.on("newMessage", handleNewMessage);
+    socket?.on("messageStatusUpdate", handleStatusUpdate);
+    socket?.on("messagesDelivered", handleMessagesDelivered);
+    socket?.on("conversationRead", handleConversationRead);
 
     return () => {
       socket?.off("newMessage", handleNewMessage);
+      socket?.off("messageStatusUpdate", handleStatusUpdate);
+      socket?.off("messagesDelivered", handleMessagesDelivered);
+      socket?.off("conversationRead", handleConversationRead);
     };
-  }, [
-    socket,
-    setMessages,
-    messages,
-    selectedConversation,
-    conversations,
-    setConversations,
-    unreadCounts,
-    setUnreadCounts,
-  ]);
+  }, [socket]);
 };
 export default useListenMessages;

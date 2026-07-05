@@ -20,11 +20,14 @@ export const sendMessage = async (req, res) => {
       });
     }
 
+    const receiverSocketId = getReceiverSocketId(receiverId);
+
     // message is created
     const newMessage = new Message({
       senderId,
       receiverId,
       message,
+      status: receiverSocketId ? "delivered" : "sent",
     });
 
     // we will push the message in conversation
@@ -34,7 +37,6 @@ export const sendMessage = async (req, res) => {
 
     await Promise.all([conversation.save(), newMessage.save()]);
 
-    const receiverSocketId = getReceiverSocketId(receiverId);
     if (receiverSocketId) {
       // io.to(<socket_id>).emit() used to send events to specific client
       io.to(receiverSocketId).emit("newMessage", newMessage);
@@ -58,6 +60,16 @@ export const getMessages = async (req, res) => {
 
     if (!conversation) {
       return res.status(200).json([]);
+    }
+
+    await Message.updateMany(
+      { senderId: userToChatId, receiverId: senderId, status: { $ne: "read" } },
+      { $set: { status: "read" } }
+    );
+
+    const senderSocketId = getReceiverSocketId(userToChatId);
+    if (senderSocketId) {
+      io.to(senderSocketId).emit("conversationRead", { readerId: senderId });
     }
 
     const messages = conversation.messages;

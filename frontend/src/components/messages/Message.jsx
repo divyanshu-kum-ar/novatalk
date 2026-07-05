@@ -31,6 +31,12 @@ const Message = ({ message }) => {
     ? profilePic
     : getDefaultAvatar(senderGender);
 
+  const getStatusIcon = () => {
+    if (message.status === "read") return <span className="text-blue-400 ml-1 font-bold">✓✓</span>;
+    if (message.status === "delivered") return <span className="text-gray-400 ml-1 font-bold">✓✓</span>;
+    return <span className="text-gray-400 ml-1 font-bold">✓</span>;
+  };
+
   return (
     <div className={`chat ${chatClassName}`}>
       <div className="chat-image avatar">
@@ -51,6 +57,7 @@ const Message = ({ message }) => {
       </div>
       <div className="chat-footer opacity-50 text-xs flex gap-1 items-center">
         {formattedTime}
+        {fromMe && getStatusIcon()}
       </div>
     </div>
   );

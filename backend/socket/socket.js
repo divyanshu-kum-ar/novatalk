@@ -1,6 +1,7 @@
 import { Server } from "socket.io";
 import http from "http";
 import express from "express";
+import Message from "../models/message.model.js";
 
 const app = express();
 
@@ -19,6 +20,25 @@ export const getReceiverSocketId = (receiverId) => {
   return userSocketMap[receiverId];
 };
 
+const markSentMessagesAsDelivered = async (receiverId) => {
+  try {
+    const sentMessages = await Message.find({ receiverId, status: "sent" });
+    if (sentMessages.length > 0) {
+      await Message.updateMany({ receiverId, status: "sent" }, { $set: { status: "delivered" } });
+      
+      const senders = [...new Set(sentMessages.map(m => m.senderId.toString()))];
+      senders.forEach(senderId => {
+        const senderSocketId = getReceiverSocketId(senderId);
+        if (senderSocketId) {
+          io.to(senderSocketId).emit("messagesDelivered", { receiverId });
+        }
+      });
+    }
+  } catch (error) {
+    console.log("Error marking messages as delivered:", error);
+  }
+};
+
 io.on("connection", (socket) => {
   console.log("a user connected", socket.id);
 
@@ -26,6 +46,7 @@ io.on("connection", (socket) => {
   const userId = socket.handshake?.query?.userId || socket.handshake?.auth?.userId;
   if (userId && userId !== "undefined") {
     userSocketMap[userId] = socket.id;
+    markSentMessagesAsDelivered(userId);
   }
 
   // notify online users list
@@ -44,6 +65,30 @@ io.on("connection", (socket) => {
     const receiverSocketId = getReceiverSocketId(receiverId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("stopTyping", { senderId });
+    }
+  });
+
+  socket.on("messageDelivered", async ({ messageId, senderId }) => {
+    try {
+      await Message.findByIdAndUpdate(messageId, { status: "delivered" });
+      const senderSocketId = getReceiverSocketId(senderId);
+      if (senderSocketId) {
+        io.to(senderSocketId).emit("messageStatusUpdate", { messageId, status: "delivered" });
+      }
+    } catch (e) {
+      console.log(e);
+    }
+  });
+
+  socket.on("messageRead", async ({ messageId, senderId }) => {
+    try {
+      await Message.findByIdAndUpdate(messageId, { status: "read" });
+      const senderSocketId = getReceiverSocketId(senderId);
+      if (senderSocketId) {
+        io.to(senderSocketId).emit("messageStatusUpdate", { messageId, status: "read" });
+      }
+    } catch (e) {
+      console.log(e);
     }
   });
 
