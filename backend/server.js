@@ -16,7 +16,7 @@ const __dirname = path.resolve();
 
 dotenv.config();
 
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
 
 app.use("/api/auth", authRoutes);
@@ -27,6 +27,15 @@ app.use(express.static(path.join(__dirname, "/frontend/dist")));
 
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "frontend", "dist", "index.html"));
+});
+
+// Error handling middleware to ensure we always return valid JSON on errors
+app.use((err, req, res, next) => {
+  if (err) {
+    res.status(err.status || 500).json({ error: err.message || "Something went wrong" });
+  } else {
+    next();
+  }
 });
 
 server.listen(PORT, () => {
