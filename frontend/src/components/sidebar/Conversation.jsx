@@ -12,7 +12,7 @@ const getDefaultAvatar = (gender) => {
 };
 
 const Conversation = ({ conversation, lastIdx, emoji }) => {
-  const { selectedConversation, setSelectedConversation } = useConversation();
+  const { selectedConversation, setSelectedConversation, unreadCounts } = useConversation();
 
   const isSelected = selectedConversation?._id === conversation._id; // it is used to make the selected user on sidebar background as blue
 
@@ -22,6 +22,8 @@ const Conversation = ({ conversation, lastIdx, emoji }) => {
   const profilePicSrc = (conversation.profilePic && !conversation.profilePic.includes("avatar.iran.liara.run"))
     ? conversation.profilePic
     : getDefaultAvatar(conversation.gender);
+
+  const unreadCount = unreadCounts[conversation._id] || 0;
 
   return (
     <>
@@ -45,9 +47,16 @@ const Conversation = ({ conversation, lastIdx, emoji }) => {
         </div>
 
         <div className="flex flex-col flex-1">
-          <div className="flex gap-3 justify-between">
+          <div className="flex gap-3 justify-between items-center">
             <p className="font-bold text-gray-200">{conversation.fullName}</p>
-            <span className="text-xl">{emoji}</span>
+            <div className="flex items-center gap-2">
+              {unreadCount > 0 && (
+                <span className="badge badge-error badge-sm text-white font-semibold rounded-full px-1.5 min-w-[20px] h-[20px] text-center">
+                  {unreadCount}
+                </span>
+              )}
+              <span className="text-xl">{emoji}</span>
+            </div>
           </div>
         </div>
       </div>

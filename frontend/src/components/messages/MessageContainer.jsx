@@ -1,3 +1,5 @@
+import { useSocketContext } from "../../context/SocketContext";
+import { useState } from "react";
 import MessageInput from "./MessageInput";
 import Messages from "./Messages";
 import { TiMessages } from "react-icons/ti";
@@ -7,11 +9,40 @@ import { useAuthContext } from "../../context/AuthContext";
 
 const MessageContainer = () => {
   const { selectedConversation, setSelectedConversation } = useConversation();
+  const { socket } = useSocketContext();
+  const [isTyping, setIsTyping] = useState(false);
 
   useEffect(() => {
     // clean up functon that refresh the setSelectedConversation to null if we logOut
     return () => setSelectedConversation(null);
   }, [setSelectedConversation]);
+
+  useEffect(() => {
+    if (!socket || !selectedConversation) return;
+
+    const handleTyping = ({ senderId }) => {
+      if (senderId === selectedConversation._id) {
+        setIsTyping(true);
+      }
+    };
+
+    const handleStopTyping = ({ senderId }) => {
+      if (senderId === selectedConversation._id) {
+        setIsTyping(false);
+      }
+    };
+
+    socket.on("typing", handleTyping);
+    socket.on("stopTyping", handleStopTyping);
+
+    // Reset state on conversation change
+    setIsTyping(false);
+
+    return () => {
+      socket.off("typing", handleTyping);
+      socket.off("stopTyping", handleStopTyping);
+    };
+  }, [socket, selectedConversation]);
 
   return (
     <div className="md:min-w-[450px] flex flex-col">
@@ -19,11 +50,18 @@ const MessageContainer = () => {
         <NoChatSelected />
       ) : (
         <>
-          <div className="bg-slate-500 px-4 py-2 mb-2">
-            <span className="label-text">To:</span>{" "}
-            <span className="text-gray-900 font-bold">
-              {selectedConversation.fullName}
-            </span>
+          <div className="bg-slate-500 px-4 py-2 mb-2 flex justify-between items-center">
+            <div>
+              <span className="label-text">To:</span>{" "}
+              <span className="text-gray-900 font-bold">
+                {selectedConversation.fullName}
+              </span>
+            </div>
+            {isTyping && (
+              <span className="text-xs text-sky-200 animate-pulse font-medium pr-2">
+                typing...
+              </span>
+            )}
           </div>
 
           <Messages />

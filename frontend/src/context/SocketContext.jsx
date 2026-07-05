@@ -15,8 +15,11 @@ export const SocketContextProvider = ({ children }) => {
 
   useEffect(() => {
     if (authUser) {
-      const socket = io("https://webchat-app-k8yk.onrender.com", {
-        query: {
+      const socketUrl = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+        ? "http://localhost:5000"
+        : "https://webchat-app-k8yk.onrender.com";
+      const socket = io(socketUrl, {
+        auth: {
           userId: authUser._id,
         },
       });
@@ -24,11 +27,13 @@ export const SocketContextProvider = ({ children }) => {
       setSocket(socket);
 
       // socket.on() is used to listen to the events. can be used both on client and server side
-      socket.on("getOnlineUsers", (users) => {
-        setOnlineUsers(users);
-      });
+      const handleOnlineUsers = (users) => setOnlineUsers(users);
+      socket.on("getOnlineUsers", handleOnlineUsers);
 
-      return () => socket.close();
+      return () => {
+        socket.off("getOnlineUsers", handleOnlineUsers);
+        socket.close();
+      };
     } else {
       if (socket) {
         socket.close();
