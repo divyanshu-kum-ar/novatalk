@@ -1,4 +1,5 @@
 import path from "path";
+import fs from "fs";
 import express from "express";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
@@ -13,20 +14,23 @@ import { app, server } from "./socket/socket.js";
 const PORT = process.env.PORT || 5000;
 
 const __dirname = path.resolve();
+const frontendDistPath = fs.existsSync(path.join(__dirname, "/frontend/dist"))
+  ? path.join(__dirname, "/frontend/dist")
+  : path.join(__dirname, "../frontend/dist");
 
 dotenv.config();
 
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "20mb" }));
 app.use(cookieParser());
 
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/users", userRoutes);
 
-app.use(express.static(path.join(__dirname, "/frontend/dist")));
+app.use(express.static(frontendDistPath));
 
 app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "frontend", "dist", "index.html"));
+  res.sendFile(path.join(frontendDistPath, "index.html"));
 });
 
 // Error handling middleware to ensure we always return valid JSON on errors

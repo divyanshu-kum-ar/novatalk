@@ -4,9 +4,26 @@ import { getReceiverSocketId, io } from "../socket/socket.js";
 
 export const sendMessage = async (req, res) => {
   try {
-    const { message, image } = req.body;
+    const { message, image, file, fileName, fileSize } = req.body;
     const { id: receiverId } = req.params; // API endpoint se reciever ID aa jayegi.
     const senderId = req.user._id; // sender ID means the authenticated user. But authenticated user id is not present. So we will use middleware to check authenticated user using JWT and grab the sender id from there
+
+    // Validation for files if present
+    if (file) {
+      if (!fileName || !fileSize) {
+        return res.status(400).json({ error: "File name and size are required for file attachment" });
+      }
+      
+      const allowedExtensions = ["pdf", "doc", "docx", "txt", "zip"];
+      const extension = fileName.split('.').pop().toLowerCase();
+      if (!allowedExtensions.includes(extension)) {
+        return res.status(400).json({ error: "Unsupported file type. Allowed: PDF, DOC, DOCX, TXT, ZIP" });
+      }
+
+      if (fileSize > 10 * 1024 * 1024) {
+        return res.status(400).json({ error: "File size must be less than 10 MB" });
+      }
+    }
 
     // First we will check whether the conversation between two above occured or not
     let conversation = await Conversation.findOne({
@@ -28,6 +45,9 @@ export const sendMessage = async (req, res) => {
       receiverId,
       message: message || "",
       image: image || null,
+      file: file || null,
+      fileName: fileName || null,
+      fileSize: fileSize || null,
       status: receiverSocketId ? "delivered" : "sent",
     });
 

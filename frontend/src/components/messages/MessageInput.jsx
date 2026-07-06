@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { BsSend, BsEmojiSmile, BsImage } from "react-icons/bs";
+import { BsSend, BsEmojiSmile, BsImage, BsPaperclip, BsFileEarmarkPdf, BsFileEarmarkWord, BsFileEarmarkText, BsFileEarmarkZip, BsFileEarmark } from "react-icons/bs";
 import useSendMessage from "../../hooks/useSendMessage";
 import useConversation from "../../zustand/useConversation";
 import { useSocketContext } from "../../context/SocketContext";
@@ -19,11 +19,39 @@ const EMOJIS = [
   "🤍", "💔", "❣️", "💕", "💞", "💓", "💗", "💖", "💘", "💝", "✨", "🌟", "⭐", "🔥", "💥", "🌈"
 ];
 
+const formatBytes = (bytes, decimals = 2) => {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+};
+
+const getFileIcon = (fileName) => {
+  if (!fileName) return <BsFileEarmark size={24} />;
+  const ext = fileName.split('.').pop().toLowerCase();
+  switch (ext) {
+    case 'pdf':
+      return <BsFileEarmarkPdf size={24} />;
+    case 'doc':
+    case 'docx':
+      return <BsFileEarmarkWord size={24} />;
+    case 'txt':
+      return <BsFileEarmarkText size={24} />;
+    case 'zip':
+      return <BsFileEarmarkZip size={24} />;
+    default:
+      return <BsFileEarmark size={24} />;
+  }
+};
+
 const MessageInput = () => {
   const [message, setMessage] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [cursorPosition, setCursorPosition] = useState(0);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -37,6 +65,7 @@ const MessageInput = () => {
   const emojiPickerRef = useRef(null);
   const emojiButtonRef = useRef(null);
   const fileInputRef = useRef(null);
+  const fileAttachmentRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -72,9 +101,42 @@ const MessageInput = () => {
       return;
     }
 
+    clearFile();
+
     const reader = new FileReader();
     reader.onloadend = () => {
       setSelectedImage(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAttachmentChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("File size must be less than 10 MB");
+      if (fileAttachmentRef.current) fileAttachmentRef.current.value = "";
+      return;
+    }
+
+    const allowedExtensions = ["pdf", "doc", "docx", "txt", "zip"];
+    const extension = file.name.split('.').pop().toLowerCase();
+    if (!allowedExtensions.includes(extension)) {
+      toast.error("Unsupported file type. Please upload PDF, DOC, DOCX, TXT, or ZIP.");
+      if (fileAttachmentRef.current) fileAttachmentRef.current.value = "";
+      return;
+    }
+
+    clearImage();
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setSelectedFile({
+        file: reader.result,
+        name: file.name,
+        size: file.size,
+      });
     };
     reader.readAsDataURL(file);
   };
@@ -88,9 +150,18 @@ const MessageInput = () => {
     }
   };
 
+  const clearFile = () => {
+    setSelectedFile(null);
+    setUploadProgress(0);
+    setIsUploading(false);
+    if (fileAttachmentRef.current) {
+      fileAttachmentRef.current.value = "";
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!message && !selectedImage) return;
+    if (!message && !selectedImage && !selectedFile) return;
 
     if (socket && selectedConversation && authUser) {
       socket.emit("stopTyping", {
@@ -119,6 +190,28 @@ const MessageInput = () => {
       setUploadProgress(100);
       setTimeout(() => {
         clearImage();
+        setMessage("");
+        setCursorPosition(0);
+      }, 200);
+    } else if (selectedFile) {
+      setIsUploading(true);
+      setUploadProgress(10);
+      const interval = setInterval(() => {
+        setUploadProgress((prev) => {
+          if (prev >= 90) {
+            clearInterval(interval);
+            return 90;
+          }
+          return prev + 15;
+        });
+      }, 100);
+
+      await sendMessage(message, null, selectedFile);
+      
+      clearInterval(interval);
+      setUploadProgress(100);
+      setTimeout(() => {
+        clearFile();
         setMessage("");
         setCursorPosition(0);
       }, 200);
@@ -208,6 +301,36 @@ const MessageInput = () => {
         </div>
       )}
 
+      {selectedFile && (
+        <div className="relative self-start p-3 bg-gray-800 border border-gray-700 rounded-lg max-w-[280px] shadow-lg flex items-center gap-3">
+          <div className="text-blue-500">
+            {getFileIcon(selectedFile.name)}
+          </div>
+          <div className="flex flex-col min-w-0 flex-1">
+            <span className="text-xs font-semibold text-white truncate max-w-[180px]">{selectedFile.name}</span>
+            <span className="text-[10px] text-gray-400">{formatBytes(selectedFile.size)}</span>
+          </div>
+          <button
+            type="button"
+            onClick={clearFile}
+            className="bg-red-500 hover:bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shadow transition-colors ml-2 flex-shrink-0"
+          >
+            &times;
+          </button>
+          {isUploading && (
+            <div className="absolute inset-0 bg-black bg-opacity-75 rounded-lg flex flex-col items-center justify-center p-1">
+              <div className="w-4/5 bg-gray-700 rounded-full h-1.5 mb-1 overflow-hidden">
+                <div
+                  className="bg-blue-500 h-1.5 rounded-full transition-all duration-200"
+                  style={{ width: `${uploadProgress}%` }}
+                ></div>
+              </div>
+              <span className="text-[10px] text-white font-medium">{uploadProgress}%</span>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="w-full relative flex items-center gap-2">
         <div className="relative flex items-center gap-1.5">
           <input
@@ -224,6 +347,23 @@ const MessageInput = () => {
             title="Attach image"
           >
             <BsImage size={20} />
+          </button>
+
+          <input
+            type="file"
+            ref={fileAttachmentRef}
+            onChange={handleAttachmentChange}
+            accept=".pdf,.doc,.docx,.txt,.zip"
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={() => fileAttachmentRef.current?.click()}
+            className="flex items-center justify-center p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition-all duration-200"
+            title="Attach file"
+            id="file-attachment-btn"
+          >
+            <BsPaperclip size={20} />
           </button>
 
           <button
