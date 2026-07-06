@@ -56,10 +56,17 @@ const MessageInput = () => {
   const [isUploading, setIsUploading] = useState(false);
 
   const { loading, sendMessage } = useSendMessage();
-  const { selectedConversation, messages, setMessages, editingMessage, setEditingMessage } = useConversation();
+  const { selectedConversation, messages, setMessages, editingMessage, setEditingMessage, replyingTo, setReplyingTo } = useConversation();
   const { socket } = useSocketContext();
   const { authUser } = useAuthContext();
   const [typingTimeout, setTypingTimeout] = useState(null);
+
+  const getReplyingSnippet = (msg) => {
+    if (!msg) return "";
+    if (msg.image) return "📷 Photo";
+    if (msg.file) return `📄 ${msg.fileName}`;
+    return msg.message || "";
+  };
 
   const inputRef = useRef(null);
   const emojiPickerRef = useRef(null);
@@ -212,12 +219,13 @@ const MessageInput = () => {
         });
       }, 100);
 
-      await sendMessage(message, selectedImage);
+      await sendMessage(message, selectedImage, null, replyingTo?._id);
       
       clearInterval(interval);
       setUploadProgress(100);
       setTimeout(() => {
         clearImage();
+        setReplyingTo(null);
         setMessage("");
         setCursorPosition(0);
       }, 200);
@@ -234,17 +242,19 @@ const MessageInput = () => {
         });
       }, 100);
 
-      await sendMessage(message, null, selectedFile);
+      await sendMessage(message, null, selectedFile, replyingTo?._id);
       
       clearInterval(interval);
       setUploadProgress(100);
       setTimeout(() => {
         clearFile();
+        setReplyingTo(null);
         setMessage("");
         setCursorPosition(0);
       }, 200);
     } else {
-      await sendMessage(message);
+      await sendMessage(message, null, null, replyingTo?._id);
+      setReplyingTo(null);
       setMessage("");
       setCursorPosition(0);
     }
@@ -310,6 +320,25 @@ const MessageInput = () => {
             className="text-gray-400 hover:text-white font-bold px-1.5 py-0.5 rounded hover:bg-gray-700 transition-colors"
           >
             Cancel (Esc)
+          </button>
+        </div>
+      )}
+      {replyingTo && (
+        <div className="flex justify-between items-center bg-gray-800 px-3 py-2 rounded-lg text-xs text-gray-400 border-l-4 border-blue-500 shadow-md">
+          <div className="flex flex-col min-w-0 flex-1">
+            <span className="font-semibold text-blue-400">
+              Replying to {replyingTo.senderId === authUser._id ? "You" : selectedConversation?.fullName}
+            </span>
+            <span className="truncate max-w-[240px] text-gray-300">
+              {getReplyingSnippet(replyingTo)}
+            </span>
+          </div>
+          <button 
+            type="button" 
+            onClick={() => setReplyingTo(null)} 
+            className="text-gray-400 hover:text-white font-bold px-1.5 py-0.5 rounded hover:bg-gray-700 transition-colors ml-2"
+          >
+            &times;
           </button>
         </div>
       )}

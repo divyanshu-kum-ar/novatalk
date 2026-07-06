@@ -53,7 +53,7 @@ const getDefaultAvatar = (gender) => {
 
 const Message = ({ message }) => {
   const { authUser } = useAuthContext();
-  const { selectedConversation, messages, setMessages, setEditingMessage } = useConversation();
+  const { selectedConversation, messages, setMessages, setEditingMessage, setReplyingTo } = useConversation();
   const [showLightbox, setShowLightbox] = useState(false);
   
   const handleDelete = async (messageId) => {
@@ -97,7 +97,7 @@ const Message = ({ message }) => {
   };
 
   return (
-    <div className={`chat ${chatClassName}`}>
+    <div id={`msg-${message._id}`} className={`chat ${chatClassName}`}>
       <div className="chat-image avatar">
         <div className="w-10 rounded-full">
           <img
@@ -112,15 +112,41 @@ const Message = ({ message }) => {
       <div
         className={`chat-bubble text-white ${shakeClass} ${bubbleBgColor} pb-2 flex flex-col gap-1.5 relative group ${fromMe ? "pr-7" : ""} min-w-[85px]`}
       >
-        {fromMe && (
-          <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity dropdown dropdown-left dropdown-end z-10">
-            <div tabIndex={0} role="button" className="text-gray-300 hover:text-white cursor-pointer p-0.5 rounded hover:bg-black hover:bg-opacity-25">
-              <BsThreeDotsVertical size={14} />
-            </div>
-            <ul tabIndex={0} className="dropdown-content z-20 menu p-1 shadow bg-gray-800 border border-gray-700 rounded-box w-20 text-[10px] text-white">
-              <li><button type="button" onClick={() => setEditingMessage(message)} className="hover:bg-gray-700">Edit</button></li>
-              <li><button type="button" onClick={() => handleDelete(message._id)} className="text-red-500 hover:text-red-400 hover:bg-gray-700">Delete</button></li>
-            </ul>
+        <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity dropdown dropdown-left dropdown-end z-10">
+          <div tabIndex={0} role="button" className="text-gray-300 hover:text-white cursor-pointer p-0.5 rounded hover:bg-black hover:bg-opacity-25">
+            <BsThreeDotsVertical size={14} />
+          </div>
+          <ul tabIndex={0} className="dropdown-content z-20 menu p-1 shadow bg-gray-800 border border-gray-700 rounded-box w-20 text-[10px] text-white">
+            {fromMe && (
+              <>
+                <li><button type="button" onClick={() => setEditingMessage(message)} className="hover:bg-gray-700">Edit</button></li>
+                <li><button type="button" onClick={() => handleDelete(message._id)} className="text-red-500 hover:text-red-400 hover:bg-gray-700">Delete</button></li>
+              </>
+            )}
+            <li><button type="button" onClick={() => setReplyingTo(message)} className="hover:bg-gray-700">Reply</button></li>
+          </ul>
+        </div>
+        {message.replyTo && (
+          <div 
+            onClick={(e) => {
+              e.preventDefault();
+              const element = document.getElementById(`msg-${message.replyTo._id}`);
+              if (element) {
+                element.scrollIntoView({ behavior: "smooth", block: "center" });
+                element.classList.add("bg-blue-900", "bg-opacity-30", "transition-all", "duration-300");
+                setTimeout(() => {
+                  element.classList.remove("bg-blue-900", "bg-opacity-30");
+                }, 1500);
+              }
+            }}
+            className="cursor-pointer mb-1 p-2 bg-black bg-opacity-20 hover:bg-opacity-30 border-l-4 border-blue-500 rounded text-xs text-gray-300 flex flex-col gap-0.5"
+          >
+            <span className="font-semibold text-blue-400">
+              {message.replyTo.senderId === authUser._id ? "You" : selectedConversation?.fullName}
+            </span>
+            <span className="truncate max-w-[200px]">
+              {message.replyTo.image ? "📷 Photo" : message.replyTo.file ? `📄 ${message.replyTo.fileName}` : message.replyTo.message}
+            </span>
           </div>
         )}
         {message.image && (

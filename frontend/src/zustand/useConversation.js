@@ -12,6 +12,8 @@ const useConversation = create((set) => ({
   setConversations: (conversations) => set({ conversations }),
   editingMessage: null,
   setEditingMessage: (editingMessage) => set({ editingMessage }),
+  replyingTo: null,
+  setReplyingTo: (replyingTo) => set({ replyingTo }),
 }));
 
 export default useConversation;

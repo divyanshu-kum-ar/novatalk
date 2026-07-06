@@ -4,7 +4,7 @@ import { getReceiverSocketId, io } from "../socket/socket.js";
 
 export const sendMessage = async (req, res) => {
   try {
-    const { message, image, file, fileName, fileSize } = req.body;
+    const { message, image, file, fileName, fileSize, replyTo } = req.body;
     const { id: receiverId } = req.params; // API endpoint se reciever ID aa jayegi.
     const senderId = req.user._id; // sender ID means the authenticated user. But authenticated user id is not present. So we will use middleware to check authenticated user using JWT and grab the sender id from there
 
@@ -48,6 +48,7 @@ export const sendMessage = async (req, res) => {
       file: file || null,
       fileName: fileName || null,
       fileSize: fileSize || null,
+      replyTo: replyTo || null,
       status: receiverSocketId ? "delivered" : "sent",
     });
 
@@ -57,6 +58,13 @@ export const sendMessage = async (req, res) => {
     }
 
     await Promise.all([conversation.save(), newMessage.save()]);
+
+    if (newMessage.replyTo) {
+      await newMessage.populate({
+        path: "replyTo",
+        select: "message image file fileName fileSize senderId"
+      });
+    }
 
     if (receiverSocketId) {
       // io.to(<socket_id>).emit() used to send events to specific client
@@ -77,7 +85,13 @@ export const getMessages = async (req, res) => {
 
     const conversation = await Conversation.findOne({
       participants: { $all: [senderId, userToChatId] },
-    }).populate("messages"); // these are actual messages given one by one as populate is used
+    }).populate({
+      path: "messages",
+      populate: {
+        path: "replyTo",
+        select: "message image file fileName fileSize senderId"
+      }
+    });
 
     if (!conversation) {
       return res.status(200).json([]);
