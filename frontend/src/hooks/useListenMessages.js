@@ -62,16 +62,30 @@ const useListenMessages = () => {
       state.setMessages(state.messages.map((m) => (m.receiverId === readerId ? { ...m, status: "read" } : m)));
     };
 
+    const handleMessageEdited = (editedMessage) => {
+      const state = useConversation.getState();
+      state.setMessages(state.messages.map((m) => (m._id === editedMessage._id ? editedMessage : m)));
+    };
+
+    const handleMessageDeleted = ({ messageId }) => {
+      const state = useConversation.getState();
+      state.setMessages(state.messages.filter((m) => m._id !== messageId));
+    };
+
     socket?.on("newMessage", handleNewMessage);
     socket?.on("messageStatusUpdate", handleStatusUpdate);
     socket?.on("messagesDelivered", handleMessagesDelivered);
     socket?.on("conversationRead", handleConversationRead);
+    socket?.on("messageEdited", handleMessageEdited);
+    socket?.on("messageDeleted", handleMessageDeleted);
 
     return () => {
       socket?.off("newMessage", handleNewMessage);
       socket?.off("messageStatusUpdate", handleStatusUpdate);
       socket?.off("messagesDelivered", handleMessagesDelivered);
       socket?.off("conversationRead", handleConversationRead);
+      socket?.off("messageEdited", handleMessageEdited);
+      socket?.off("messageDeleted", handleMessageDeleted);
     };
   }, [socket]);
 };

@@ -27,6 +27,10 @@ const messageSchema = new mongoose.Schema(
     fileSize: {
       type: Number,
     },
+    edited: {
+      type: Boolean,
+      default: false,
+    },
     status: {
       type: String,
       enum: ["sent", "delivered", "read"],

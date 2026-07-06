@@ -56,7 +56,7 @@ const MessageInput = () => {
   const [isUploading, setIsUploading] = useState(false);
 
   const { loading, sendMessage } = useSendMessage();
-  const { selectedConversation } = useConversation();
+  const { selectedConversation, messages, setMessages, editingMessage, setEditingMessage } = useConversation();
   const { socket } = useSocketContext();
   const { authUser } = useAuthContext();
   const [typingTimeout, setTypingTimeout] = useState(null);
@@ -83,6 +83,15 @@ const MessageInput = () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  useEffect(() => {
+    if (editingMessage) {
+      setMessage(editingMessage.message);
+      inputRef.current?.focus();
+    } else {
+      setMessage("");
+    }
+  }, [editingMessage]);
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -171,7 +180,26 @@ const MessageInput = () => {
       if (typingTimeout) clearTimeout(typingTimeout);
     }
 
-    if (selectedImage) {
+    if (editingMessage) {
+      try {
+        const res = await fetch(`/api/messages/edit/${editingMessage._id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ message }),
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+
+        setMessages(messages.map((m) => (m._id === editingMessage._id ? data : m)));
+        setEditingMessage(null);
+        setMessage("");
+        setCursorPosition(0);
+      } catch (err) {
+        toast.error(err.message);
+      }
+    } else if (selectedImage) {
       setIsUploading(true);
       setUploadProgress(10);
       const interval = setInterval(() => {
@@ -273,6 +301,18 @@ const MessageInput = () => {
 
   return (
     <form className="px-4 my-3 flex flex-col gap-2" onSubmit={handleSubmit}>
+      {editingMessage && (
+        <div className="flex justify-between items-center bg-gray-800 px-3 py-1 rounded-lg text-xs text-gray-400 border border-gray-700 shadow-md">
+          <span className="font-semibold text-blue-400">Editing message</span>
+          <button 
+            type="button" 
+            onClick={() => setEditingMessage(null)} 
+            className="text-gray-400 hover:text-white font-bold px-1.5 py-0.5 rounded hover:bg-gray-700 transition-colors"
+          >
+            Cancel (Esc)
+          </button>
+        </div>
+      )}
       {selectedImage && (
         <div className="relative self-start p-1 bg-gray-800 border border-gray-700 rounded-lg max-w-[200px] shadow-lg">
           <img
@@ -405,12 +445,17 @@ const MessageInput = () => {
             type="text"
             ref={inputRef}
             className="border text-sm rounded-lg block w-full p-2.5 bg-gray-700 border-gray-600 text-white pr-10"
-            placeholder="Send a message"
+            placeholder={editingMessage ? "Edit message..." : "Send a message"}
             value={message}
             onChange={handleInputChange}
             onClick={saveCursorPosition}
             onKeyUp={saveCursorPosition}
             onBlur={saveCursorPosition}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                setEditingMessage(null);
+              }
+            }}
           />
           <button
             type="submit"

@@ -10,6 +10,8 @@ const useConversation = create((set) => ({
   setUnreadCounts: (unreadCounts) => set({ unreadCounts }),
   conversations: [],
   setConversations: (conversations) => set({ conversations }),
+  editingMessage: null,
+  setEditingMessage: (editingMessage) => set({ editingMessage }),
 }));
 
 export default useConversation;

@@ -2,7 +2,8 @@ import { useAuthContext } from "../../context/AuthContext";
 import { extractTime } from "../../utils/extractTime";
 import useConversation from "../../zustand/useConversation";
 import { useState } from "react";
-import { BsDownload, BsFileEarmarkPdf, BsFileEarmarkWord, BsFileEarmarkText, BsFileEarmarkZip, BsFileEarmark } from "react-icons/bs";
+import { BsDownload, BsFileEarmarkPdf, BsFileEarmarkWord, BsFileEarmarkText, BsFileEarmarkZip, BsFileEarmark, BsThreeDotsVertical } from "react-icons/bs";
+import toast from "react-hot-toast";
 
 const formatBytes = (bytes, decimals = 2) => {
   if (bytes === 0) return '0 Bytes';
@@ -52,8 +53,27 @@ const getDefaultAvatar = (gender) => {
 
 const Message = ({ message }) => {
   const { authUser } = useAuthContext();
-  const { selectedConversation } = useConversation();
+  const { selectedConversation, messages, setMessages, setEditingMessage } = useConversation();
   const [showLightbox, setShowLightbox] = useState(false);
+  
+  const handleDelete = async (messageId) => {
+    const confirmDelete = window.confirm("Are you sure you want to delete this message?");
+    if (!confirmDelete) return;
+
+    try {
+      const res = await fetch(`/api/messages/delete/${messageId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      setMessages(messages.filter((m) => m._id !== messageId));
+      toast.success("Message deleted successfully");
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
   const fromMe = message.senderId === authUser._id;
   const formattedTime = extractTime(message.createdAt);
   const chatClassName = fromMe ? "chat-end" : "chat-start";
@@ -90,8 +110,19 @@ const Message = ({ message }) => {
         </div>
       </div>
       <div
-        className={`chat-bubble text-white ${shakeClass} ${bubbleBgColor} pb-2 flex flex-col gap-1.5`}
+        className={`chat-bubble text-white ${shakeClass} ${bubbleBgColor} pb-2 flex flex-col gap-1.5 relative group ${fromMe ? "pr-7" : ""} min-w-[85px]`}
       >
+        {fromMe && (
+          <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity dropdown dropdown-left dropdown-end z-10">
+            <div tabIndex={0} role="button" className="text-gray-300 hover:text-white cursor-pointer p-0.5 rounded hover:bg-black hover:bg-opacity-25">
+              <BsThreeDotsVertical size={14} />
+            </div>
+            <ul tabIndex={0} className="dropdown-content z-20 menu p-1 shadow bg-gray-800 border border-gray-700 rounded-box w-20 text-[10px] text-white">
+              <li><button type="button" onClick={() => setEditingMessage(message)} className="hover:bg-gray-700">Edit</button></li>
+              <li><button type="button" onClick={() => handleDelete(message._id)} className="text-red-500 hover:text-red-400 hover:bg-gray-700">Delete</button></li>
+            </ul>
+          </div>
+        )}
         {message.image && (
           <div className="relative cursor-pointer max-w-[240px] overflow-hidden rounded-lg group">
             <img
@@ -124,7 +155,12 @@ const Message = ({ message }) => {
             </button>
           </div>
         )}
-        {message.message && <span>{message.message}</span>}
+        {message.message && (
+          <span className="break-words">
+            {message.message}
+            {message.edited && <span className="text-[9px] opacity-60 ml-1.5 select-none font-normal">(edited)</span>}
+          </span>
+        )}
       </div>
       <div className="chat-footer opacity-50 text-xs flex gap-1 items-center">
         {formattedTime}
