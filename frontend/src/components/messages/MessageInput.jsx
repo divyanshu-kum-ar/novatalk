@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { BsSend, BsEmojiSmile } from "react-icons/bs";
+import { BsSend, BsEmojiSmile, BsImage } from "react-icons/bs";
 import useSendMessage from "../../hooks/useSendMessage";
 import useConversation from "../../zustand/useConversation";
 import { useSocketContext } from "../../context/SocketContext";
 import { useAuthContext } from "../../context/AuthContext";
+import toast from "react-hot-toast";
 
 const EMOJIS = [
   "😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉", "😌", "😍", "🥰", 
@@ -22,6 +23,10 @@ const MessageInput = () => {
   const [message, setMessage] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [cursorPosition, setCursorPosition] = useState(0);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+
   const { loading, sendMessage } = useSendMessage();
   const { selectedConversation } = useConversation();
   const { socket } = useSocketContext();
@@ -31,6 +36,7 @@ const MessageInput = () => {
   const inputRef = useRef(null);
   const emojiPickerRef = useRef(null);
   const emojiButtonRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -49,9 +55,42 @@ const MessageInput = () => {
     };
   }, []);
 
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File size must be less than 5 MB");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error("Unsupported file type. Please upload JPG, JPEG, PNG, GIF, or WEBP.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setSelectedImage(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const clearImage = () => {
+    setSelectedImage(null);
+    setUploadProgress(0);
+    setIsUploading(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!message) return;
+    if (!message && !selectedImage) return;
 
     if (socket && selectedConversation && authUser) {
       socket.emit("stopTyping", {
@@ -61,9 +100,33 @@ const MessageInput = () => {
       if (typingTimeout) clearTimeout(typingTimeout);
     }
 
-    await sendMessage(message);
-    setMessage("");
-    setCursorPosition(0);
+    if (selectedImage) {
+      setIsUploading(true);
+      setUploadProgress(10);
+      const interval = setInterval(() => {
+        setUploadProgress((prev) => {
+          if (prev >= 90) {
+            clearInterval(interval);
+            return 90;
+          }
+          return prev + 15;
+        });
+      }, 100);
+
+      await sendMessage(message, selectedImage);
+      
+      clearInterval(interval);
+      setUploadProgress(100);
+      setTimeout(() => {
+        clearImage();
+        setMessage("");
+        setCursorPosition(0);
+      }, 200);
+    } else {
+      await sendMessage(message);
+      setMessage("");
+      setCursorPosition(0);
+    }
   };
 
   const handleInputChange = (e) => {
@@ -116,9 +179,53 @@ const MessageInput = () => {
   };
 
   return (
-    <form className="px-4 my-3" onSubmit={handleSubmit}>
+    <form className="px-4 my-3 flex flex-col gap-2" onSubmit={handleSubmit}>
+      {selectedImage && (
+        <div className="relative self-start p-1 bg-gray-800 border border-gray-700 rounded-lg max-w-[200px] shadow-lg">
+          <img
+            src={selectedImage}
+            alt="Upload preview"
+            className="h-20 w-auto rounded object-cover"
+          />
+          <button
+            type="button"
+            onClick={clearImage}
+            className="absolute -top-1.5 -right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shadow transition-colors"
+          >
+            &times;
+          </button>
+          {isUploading && (
+            <div className="absolute inset-0 bg-black bg-opacity-75 rounded-lg flex flex-col items-center justify-center p-1">
+              <div className="w-4/5 bg-gray-700 rounded-full h-1.5 mb-1 overflow-hidden">
+                <div
+                  className="bg-blue-500 h-1.5 rounded-full transition-all duration-200"
+                  style={{ width: `${uploadProgress}%` }}
+                ></div>
+              </div>
+              <span className="text-[10px] text-white font-medium">{uploadProgress}%</span>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="w-full relative flex items-center gap-2">
-        <div className="relative">
+        <div className="relative flex items-center gap-1.5">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept="image/jpeg, image/jpg, image/png, image/gif, image/webp"
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center justify-center p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition-all duration-200"
+            title="Attach image"
+          >
+            <BsImage size={20} />
+          </button>
+
           <button
             type="button"
             ref={emojiButtonRef}
