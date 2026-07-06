@@ -55,7 +55,79 @@ const Message = ({ message }) => {
   const { authUser } = useAuthContext();
   const { selectedConversation, messages, setMessages, setEditingMessage, setReplyingTo } = useConversation();
   const [showLightbox, setShowLightbox] = useState(false);
-  
+  const [showPicker, setShowPicker] = useState(false);
+
+  let pressTimer;
+  const handleTouchStart = () => {
+    pressTimer = setTimeout(() => {
+      setShowPicker(true);
+    }, 500);
+  };
+  const handleTouchEnd = () => {
+    clearTimeout(pressTimer);
+  };
+
+  const handleMouseEnter = () => {
+    if (window.matchMedia("(hover: hover)").matches) {
+      setShowPicker(true);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (window.matchMedia("(hover: hover)").matches) {
+      setShowPicker(false);
+    }
+  };
+
+  const handleReact = async (emoji) => {
+    try {
+      const res = await fetch(`/api/messages/react/${message._id}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ emoji }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      setMessages(
+        messages.map((m) => (m._id === message._id ? { ...m, reactions: data } : m))
+      );
+      setShowPicker(false);
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const getReactionUsernames = (usersList) => {
+    return usersList
+      .map((u) => {
+        if (typeof u === "object" && u !== null) {
+          return u.username === authUser.username ? "You" : u.username;
+        }
+        return "Someone";
+      })
+      .filter(Boolean)
+      .join(", ");
+  };
+
+  const handleReactionClick = (emoji, userNames) => {
+    handleReact(emoji);
+    toast(`${emoji} reactions: ${userNames}`, { id: `react-toast-${message._id}` });
+  };
+
+  const reactions = message.reactions || [];
+  const groupedReactions = {};
+  reactions.forEach((r) => {
+    if (r.userId) {
+      if (!groupedReactions[r.emoji]) {
+        groupedReactions[r.emoji] = [];
+      }
+      groupedReactions[r.emoji].push(r.userId);
+    }
+  });
+
   const handleDelete = async (messageId) => {
     const confirmDelete = window.confirm("Are you sure you want to delete this message?");
     if (!confirmDelete) return;
@@ -111,7 +183,35 @@ const Message = ({ message }) => {
       </div>
       <div
         className={`chat-bubble text-white ${shakeClass} ${bubbleBgColor} pb-2 flex flex-col gap-1.5 relative group ${fromMe ? "pr-7" : ""} min-w-[85px]`}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setShowPicker(true);
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
       >
+        {showPicker && (
+          <div
+            className={`absolute bottom-[105%] ${fromMe ? "right-0" : "left-0"} mb-1 bg-gray-800 border border-gray-700 rounded-full py-1 px-2.5 flex gap-1.5 shadow-xl z-50 animate-fade-in`}
+            onMouseEnter={() => setShowPicker(true)}
+            onMouseLeave={() => setShowPicker(false)}
+          >
+            {["❤️", "😂", "👍", "👎", "😮", "😢", "😡", "🎉"].map((emoji) => (
+              <button
+                key={emoji}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleReact(emoji);
+                }}
+                className="hover:scale-125 transition-transform text-lg p-1 focus:outline-none"
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity dropdown dropdown-left dropdown-end z-10">
           <div tabIndex={0} role="button" className="text-gray-300 hover:text-white cursor-pointer p-0.5 rounded hover:bg-black hover:bg-opacity-25">
             <BsThreeDotsVertical size={14} />
@@ -188,6 +288,40 @@ const Message = ({ message }) => {
           </span>
         )}
       </div>
+      {Object.keys(groupedReactions).length > 0 && (
+        <div className={`flex flex-wrap gap-1 mt-1 max-w-[280px] ${fromMe ? "justify-end" : "justify-start"}`}>
+          {Object.entries(groupedReactions).map(([emoji, users]) => {
+            const hasReacted = users.some(
+              (u) => {
+                const id = typeof u === "object" && u !== null ? u._id : u;
+                return String(id) === String(authUser._id);
+              }
+            );
+            const userNames = getReactionUsernames(users);
+            return (
+              <div
+                key={emoji}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleReactionClick(emoji, userNames);
+                }}
+                className={`group/react relative flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs cursor-pointer select-none transition-all ${
+                  hasReacted
+                    ? "bg-blue-600 bg-opacity-30 border border-blue-500 text-white"
+                    : "bg-gray-800 bg-opacity-50 border border-gray-700 text-gray-300 hover:bg-gray-700"
+                }`}
+              >
+                <span>{emoji}</span>
+                <span className="font-semibold">{users.length}</span>
+                
+                <div className={`absolute bottom-full mb-2 hidden group-hover/react:block bg-gray-900 text-white text-[10px] rounded py-1 px-2 whitespace-nowrap z-[100] shadow-lg border border-gray-700 ${fromMe ? "right-0" : "left-0"}`}>
+                  {userNames}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
       <div className="chat-footer opacity-50 text-xs flex gap-1 items-center">
         {formattedTime}
         {fromMe && getStatusIcon()}
