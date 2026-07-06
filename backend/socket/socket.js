@@ -2,6 +2,7 @@ import { Server } from "socket.io";
 import http from "http";
 import express from "express";
 import Message from "../models/message.model.js";
+import User from "../models/user.model.js";
 
 const app = express();
 
@@ -93,9 +94,18 @@ io.on("connection", (socket) => {
   });
 
   // socket.on() is used to listen to the events. can be used both on client and server side
-  socket.on("disconnect", () => {
+  socket.on("disconnect", async () => {
     console.log("user disconnected", socket.id);
-    if (userId) delete userSocketMap[userId];
+    if (userId && userId !== "undefined") {
+      delete userSocketMap[userId];
+      const lastSeenTime = new Date();
+      try {
+        await User.findByIdAndUpdate(userId, { lastSeen: lastSeenTime });
+        io.emit("userOffline", { userId, lastSeen: lastSeenTime });
+      } catch (error) {
+        console.log("Error updating lastSeen on disconnect:", error);
+      }
+    }
     io.emit("getOnlineUsers", Object.keys(userSocketMap));
   });
 });

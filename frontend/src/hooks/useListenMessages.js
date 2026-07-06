@@ -72,12 +72,21 @@ const useListenMessages = () => {
       state.setMessages(state.messages.filter((m) => m._id !== messageId));
     };
 
+    const handleUserOffline = ({ userId, lastSeen }) => {
+      const state = useConversation.getState();
+      state.setConversations(state.conversations.map(c => c._id === userId ? { ...c, lastSeen } : c));
+      if (state.selectedConversation && state.selectedConversation._id === userId) {
+        state.setSelectedConversation({ ...state.selectedConversation, lastSeen });
+      }
+    };
+
     socket?.on("newMessage", handleNewMessage);
     socket?.on("messageStatusUpdate", handleStatusUpdate);
     socket?.on("messagesDelivered", handleMessagesDelivered);
     socket?.on("conversationRead", handleConversationRead);
     socket?.on("messageEdited", handleMessageEdited);
     socket?.on("messageDeleted", handleMessageDeleted);
+    socket?.on("userOffline", handleUserOffline);
 
     return () => {
       socket?.off("newMessage", handleNewMessage);
@@ -86,6 +95,7 @@ const useListenMessages = () => {
       socket?.off("conversationRead", handleConversationRead);
       socket?.off("messageEdited", handleMessageEdited);
       socket?.off("messageDeleted", handleMessageDeleted);
+      socket?.off("userOffline", handleUserOffline);
     };
   }, [socket]);
 };

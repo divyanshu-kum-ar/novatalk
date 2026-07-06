@@ -90,8 +90,12 @@ export const login = async (req, res) => {
     });
   }
 };
-export const logout = (req, res) => {
+export const logout = async (req, res) => {
   try {
+    const userId = req.user?._id;
+    if (userId) {
+      await User.findByIdAndUpdate(userId, { lastSeen: new Date() });
+    }
     res.cookie("jwt", "", { maxAge: 0 });
     res.status(200).json({ message: "Logged Out successfully" });
   } catch (error) {
