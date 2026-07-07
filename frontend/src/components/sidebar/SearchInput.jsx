@@ -16,15 +16,16 @@ const SearchInput = () => {
       return toast.error("Search term must atleast 3 characters long");
     }
 
-    const conversation = conversations.find((c) =>
-      c.fullName.toLowerCase().includes(search.toLowerCase())
-    );
+    const conversation = conversations.find((c) => {
+      const name = c.isGroup ? c.groupName : c.fullName;
+      return name?.toLowerCase().includes(search.toLowerCase());
+    });
 
     if (conversation) {
       setSelectedConversation(conversation);
       setSearch("");
     } else {
-      toast.error("No such user found!");
+      toast.error("No such conversation found!");
     }
   };
 

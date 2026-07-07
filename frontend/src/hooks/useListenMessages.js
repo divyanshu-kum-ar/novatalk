@@ -18,7 +18,9 @@ const useListenMessages = () => {
       const currentConvs = state.conversations;
       const currentUnreads = state.unreadCounts;
 
-      const isFromActive = newMessage.senderId === activeConv?._id;
+      const senderId = typeof newMessage.senderId === "object" && newMessage.senderId !== null ? newMessage.senderId._id : newMessage.senderId;
+      const conversationKey = newMessage.conversationId || senderId;
+      const isFromActive = activeConv && activeConv._id === conversationKey;
 
       // Play notification sound
       const sound = new Audio(notificationSound);
@@ -28,21 +30,24 @@ const useListenMessages = () => {
         newMessage.shouldShake = true;
         newMessage.status = "read";
         state.setMessages([...currentMessages, newMessage]);
-        socket?.emit("messageRead", { messageId: newMessage._id, senderId: newMessage.senderId });
+        if (!newMessage.conversationId) {
+          socket?.emit("messageRead", { messageId: newMessage._id, senderId: senderId });
+        }
       } else {
-        const senderId = newMessage.senderId;
-        const currentCount = currentUnreads[senderId] || 0;
+        const currentCount = currentUnreads[conversationKey] || 0;
         state.setUnreadCounts({
           ...currentUnreads,
-          [senderId]: currentCount + 1,
+          [conversationKey]: currentCount + 1,
         });
-        socket?.emit("messageDelivered", { messageId: newMessage._id, senderId: newMessage.senderId });
+        if (!newMessage.conversationId) {
+          socket?.emit("messageDelivered", { messageId: newMessage._id, senderId: senderId });
+        }
       }
 
       // Move the conversation with the latest incoming message to the top
-      const matchedConv = currentConvs.find((c) => c._id === newMessage.senderId);
+      const matchedConv = currentConvs.find((c) => c._id === conversationKey);
       if (matchedConv) {
-        const remainingConvs = currentConvs.filter((c) => c._id !== newMessage.senderId);
+        const remainingConvs = currentConvs.filter((c) => c._id !== conversationKey);
         state.setConversations([matchedConv, ...remainingConvs]);
       }
     };

@@ -17,11 +17,14 @@ const Conversation = ({ conversation, lastIdx, emoji }) => {
   const isSelected = selectedConversation?._id === conversation._id; // it is used to make the selected user on sidebar background as blue
 
   const { onlineUsers } = useSocketContext();
-  const isOnline = onlineUsers.includes(conversation._id);
+  const isGroup = conversation.isGroup;
+  const isOnline = isGroup ? false : onlineUsers.includes(conversation._id);
 
-  const profilePicSrc = (conversation.profilePic && !conversation.profilePic.includes("avatar.iran.liara.run"))
-    ? conversation.profilePic
-    : getDefaultAvatar(conversation.gender);
+  const profilePicSrc = isGroup
+    ? (conversation.groupAvatar && conversation.groupAvatar !== "" ? conversation.groupAvatar : DEFAULT_AVATAR_GENERIC)
+    : ((conversation.profilePic && !conversation.profilePic.includes("avatar.iran.liara.run"))
+      ? conversation.profilePic
+      : getDefaultAvatar(conversation.gender));
 
   const unreadCount = unreadCounts[conversation._id] || 0;
 
@@ -35,12 +38,12 @@ const Conversation = ({ conversation, lastIdx, emoji }) => {
         onClick={() => setSelectedConversation(conversation)}
       >
         <div className={`avatar ${isOnline ? "online" : ""}`}>
-          <div className="w-12 rounded-full">
+          <div className="w-12 rounded-full bg-slate-700 flex items-center justify-center">
             <img
               src={profilePicSrc}
               alt="user avatar"
               onError={(e) => {
-                e.target.src = getDefaultAvatar(conversation.gender);
+                e.target.src = isGroup ? DEFAULT_AVATAR_GENERIC : getDefaultAvatar(conversation.gender);
               }}
             />
           </div>
@@ -48,7 +51,7 @@ const Conversation = ({ conversation, lastIdx, emoji }) => {
 
         <div className="flex flex-col flex-1">
           <div className="flex gap-3 justify-between items-center">
-            <p className="font-bold text-gray-200">{conversation.fullName}</p>
+            <p className="font-bold text-gray-200">{isGroup ? conversation.groupName : conversation.fullName}</p>
             <div className="flex items-center gap-2">
               {unreadCount > 0 && (
                 <span className="badge badge-error badge-sm text-white font-semibold rounded-full px-1.5 min-w-[20px] h-[20px] text-center">

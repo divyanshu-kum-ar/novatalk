@@ -5,8 +5,8 @@ import { getReceiverSocketId, io } from "../socket/socket.js";
 export const sendMessage = async (req, res) => {
   try {
     const { message, image, file, fileName, fileSize, replyTo } = req.body;
-    const { id: receiverId } = req.params; // API endpoint se reciever ID aa jayegi.
-    const senderId = req.user._id; // sender ID means the authenticated user. But authenticated user id is not present. So we will use middleware to check authenticated user using JWT and grab the sender id from there
+    const { id: receiverId } = req.params; // receiverId can be user ID or group Conversation ID
+    const senderId = req.user._id;
 
     // Validation for files if present
     if (file) {
@@ -25,31 +25,42 @@ export const sendMessage = async (req, res) => {
       }
     }
 
-    // First we will check whether the conversation between two above occured or not
+    // Check if the receiverId corresponds to a group conversation
     let conversation = await Conversation.findOne({
-      participants: { $all: [senderId, receiverId] },
+      _id: receiverId,
+      isGroup: true,
     });
 
-    // If not occured, we will create a new filed in conversation model and default message will be empty array
-    if (!conversation) {
-      conversation = await Conversation.create({
-        participants: [senderId, receiverId],
+    let isGroupChat = false;
+    if (conversation) {
+      isGroupChat = true;
+    } else {
+      // 1-to-1 conversation check/creation
+      conversation = await Conversation.findOne({
+        participants: { $all: [senderId, receiverId] },
+        isGroup: { $ne: true },
       });
+
+      if (!conversation) {
+        conversation = await Conversation.create({
+          participants: [senderId, receiverId],
+        });
+      }
     }
 
-    const receiverSocketId = getReceiverSocketId(receiverId);
+    const receiverSocketId = isGroupChat ? null : getReceiverSocketId(receiverId);
 
     // message is created
     const newMessage = new Message({
       senderId,
-      receiverId,
+      receiverId: isGroupChat ? null : receiverId,
       message: message || "",
       image: image || null,
       file: file || null,
       fileName: fileName || null,
       fileSize: fileSize || null,
       replyTo: replyTo || null,
-      status: receiverSocketId ? "delivered" : "sent",
+      status: isGroupChat ? "sent" : (receiverSocketId ? "delivered" : "sent"),
     });
 
     // we will push the message in conversation
@@ -59,6 +70,11 @@ export const sendMessage = async (req, res) => {
 
     await Promise.all([conversation.save(), newMessage.save()]);
 
+    await newMessage.populate({
+      path: "senderId",
+      select: "username fullName profilePic gender"
+    });
+
     if (newMessage.replyTo) {
       await newMessage.populate({
         path: "replyTo",
@@ -66,12 +82,26 @@ export const sendMessage = async (req, res) => {
       });
     }
 
-    if (receiverSocketId) {
-      // io.to(<socket_id>).emit() used to send events to specific client
-      io.to(receiverSocketId).emit("newMessage", newMessage);
+    const messageResponse = newMessage.toObject();
+
+    if (isGroupChat) {
+      messageResponse.conversationId = conversation._id.toString();
+      // Broadcast to all participants in the group except the sender
+      conversation.participants.forEach((pId) => {
+        if (pId.toString() !== senderId.toString()) {
+          const pSocketId = getReceiverSocketId(pId);
+          if (pSocketId) {
+            io.to(pSocketId).emit("newMessage", messageResponse);
+          }
+        }
+      });
+    } else {
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit("newMessage", messageResponse);
+      }
     }
 
-    res.status(201).send(newMessage);
+    res.status(201).send(messageResponse);
   } catch (error) {
     console.log("Error in sendMessage controller:", error);
     res.status(500).json({ error: "Internal Server Error" });
@@ -83,11 +113,17 @@ export const getMessages = async (req, res) => {
     const { id: userToChatId } = req.params;
     const senderId = req.user._id;
 
-    const conversation = await Conversation.findOne({
-      participants: { $all: [senderId, userToChatId] },
+    // Check if userToChatId is a group conversation ID
+    let conversation = await Conversation.findOne({
+      _id: userToChatId,
+      isGroup: true,
     }).populate({
       path: "messages",
       populate: [
+        {
+          path: "senderId",
+          select: "username fullName profilePic gender"
+        },
         {
           path: "replyTo",
           select: "message image file fileName fileSize senderId"
@@ -100,17 +136,44 @@ export const getMessages = async (req, res) => {
     });
 
     if (!conversation) {
+      // Fallback to 1-to-1 conversation
+      conversation = await Conversation.findOne({
+        participants: { $all: [senderId, userToChatId] },
+        isGroup: { $ne: true },
+      }).populate({
+        path: "messages",
+        populate: [
+          {
+            path: "senderId",
+            select: "username fullName profilePic gender"
+          },
+          {
+            path: "replyTo",
+            select: "message image file fileName fileSize senderId"
+          },
+          {
+            path: "reactions.userId",
+            select: "username fullName"
+          }
+        ]
+      });
+    }
+
+    if (!conversation) {
       return res.status(200).json([]);
     }
 
-    await Message.updateMany(
-      { senderId: userToChatId, receiverId: senderId, status: { $ne: "read" } },
-      { $set: { status: "read" } }
-    );
+    // Update status and emit events for 1-to-1 chats only
+    if (!conversation.isGroup) {
+      await Message.updateMany(
+        { senderId: userToChatId, receiverId: senderId, status: { $ne: "read" } },
+        { $set: { status: "read" } }
+      );
 
-    const senderSocketId = getReceiverSocketId(userToChatId);
-    if (senderSocketId) {
-      io.to(senderSocketId).emit("conversationRead", { readerId: senderId });
+      const senderSocketId = getReceiverSocketId(userToChatId);
+      if (senderSocketId) {
+        io.to(senderSocketId).emit("conversationRead", { readerId: senderId });
+      }
     }
 
     const messages = conversation.messages;
@@ -140,13 +203,29 @@ export const editMessage = async (req, res) => {
     msg.edited = true;
     await msg.save();
 
-    const receiverSocketId = getReceiverSocketId(msg.receiverId);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("messageEdited", msg);
-    }
-    const senderSocketId = getReceiverSocketId(senderId);
-    if (senderSocketId && senderSocketId !== receiverSocketId) {
-      io.to(senderSocketId).emit("messageEdited", msg);
+    await msg.populate({
+      path: "senderId",
+      select: "username fullName profilePic gender"
+    });
+
+    const conversation = await Conversation.findOne({ messages: messageId });
+    if (conversation && conversation.isGroup) {
+      // Broadcast to all participants in the group
+      conversation.participants.forEach((pId) => {
+        const socketId = getReceiverSocketId(pId);
+        if (socketId) {
+          io.to(socketId).emit("messageEdited", msg);
+        }
+      });
+    } else {
+      const receiverSocketId = getReceiverSocketId(msg.receiverId);
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit("messageEdited", msg);
+      }
+      const senderSocketId = getReceiverSocketId(senderId);
+      if (senderSocketId && senderSocketId !== receiverSocketId) {
+        io.to(senderSocketId).emit("messageEdited", msg);
+      }
     }
 
     res.status(200).json(msg);
@@ -170,22 +249,31 @@ export const deleteMessage = async (req, res) => {
       return res.status(403).json({ error: "You can only delete your own messages" });
     }
 
-    // Pull from conversation messages array
-    await Conversation.updateOne(
-      { participants: { $all: [msg.senderId, msg.receiverId] } },
-      { $pull: { messages: messageId } }
-    );
+    const conversation = await Conversation.findOne({ messages: messageId });
+    if (conversation) {
+      conversation.messages.pull(messageId);
+      await conversation.save();
+    }
 
     // Delete message
     await Message.findByIdAndDelete(messageId);
 
-    const receiverSocketId = getReceiverSocketId(msg.receiverId);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("messageDeleted", { messageId });
-    }
-    const senderSocketId = getReceiverSocketId(senderId);
-    if (senderSocketId && senderSocketId !== receiverSocketId) {
-      io.to(senderSocketId).emit("messageDeleted", { messageId });
+    if (conversation && conversation.isGroup) {
+      conversation.participants.forEach((pId) => {
+        const socketId = getReceiverSocketId(pId);
+        if (socketId) {
+          io.to(socketId).emit("messageDeleted", { messageId });
+        }
+      });
+    } else {
+      const receiverSocketId = getReceiverSocketId(msg.receiverId);
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit("messageDeleted", { messageId });
+      }
+      const senderSocketId = getReceiverSocketId(senderId);
+      if (senderSocketId && senderSocketId !== receiverSocketId) {
+        io.to(senderSocketId).emit("messageDeleted", { messageId });
+      }
     }
 
     res.status(200).json({ message: "Message deleted successfully" });
@@ -255,19 +343,32 @@ export const toggleReaction = async (req, res) => {
       select: "username fullName",
     });
 
-    const receiverSocketId = getReceiverSocketId(msg.receiverId);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("messageReactionUpdate", {
-        messageId: msg._id,
-        reactions: msg.reactions,
+    const conversation = await Conversation.findOne({ messages: messageId });
+    if (conversation && conversation.isGroup) {
+      conversation.participants.forEach((pId) => {
+        const socketId = getReceiverSocketId(pId);
+        if (socketId) {
+          io.to(socketId).emit("messageReactionUpdate", {
+            messageId: msg._id,
+            reactions: msg.reactions,
+          });
+        }
       });
-    }
-    const senderSocketId = getReceiverSocketId(msg.senderId);
-    if (senderSocketId && senderSocketId !== receiverSocketId) {
-      io.to(senderSocketId).emit("messageReactionUpdate", {
-        messageId: msg._id,
-        reactions: msg.reactions,
-      });
+    } else {
+      const receiverSocketId = getReceiverSocketId(msg.receiverId);
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit("messageReactionUpdate", {
+          messageId: msg._id,
+          reactions: msg.reactions,
+        });
+      }
+      const senderSocketId = getReceiverSocketId(msg.senderId);
+      if (senderSocketId && senderSocketId !== receiverSocketId) {
+        io.to(senderSocketId).emit("messageReactionUpdate", {
+          messageId: msg._id,
+          reactions: msg.reactions,
+        });
+      }
     }
 
     res.status(200).json(msg.reactions);

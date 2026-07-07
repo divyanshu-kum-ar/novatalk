@@ -6,14 +6,23 @@ import { TiMessages } from "react-icons/ti";
 import useConversation from "./../../zustand/useConversation";
 import { useEffect } from "react";
 import { useAuthContext } from "../../context/AuthContext";
+import ManageGroupModal from "./ManageGroupModal";
 
 const MessageContainer = () => {
+  const { authUser } = useAuthContext();
   const { selectedConversation, setSelectedConversation } = useConversation();
   const { socket, onlineUsers } = useSocketContext();
   const [isTyping, setIsTyping] = useState(false);
   const [tick, setTick] = useState(0);
+  const [isManageOpen, setIsManageOpen] = useState(false);
 
-  const isOnline = selectedConversation && onlineUsers.includes(selectedConversation._id);
+  const isGroup = selectedConversation?.isGroup;
+  const isOnline = !isGroup && selectedConversation && onlineUsers.includes(selectedConversation._id);
+
+  const isCreator = isGroup && (
+    selectedConversation.groupCreator === authUser._id ||
+    selectedConversation.groupCreator?._id === authUser._id
+  );
 
   const formatLastSeen = (dateString) => {
     if (!dateString) return "Offline";
@@ -114,12 +123,24 @@ const MessageContainer = () => {
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5">
                 <span className="label-text text-gray-200">To:</span>{" "}
-                <span className="text-gray-900 font-bold">
-                  {selectedConversation.fullName}
+                <span className="text-gray-900 font-bold flex items-center gap-2">
+                  {isGroup ? selectedConversation.groupName : selectedConversation.fullName}
+                  {isCreator && (
+                    <button
+                      type="button"
+                      onClick={() => setIsManageOpen(true)}
+                      className="text-xs bg-slate-700 hover:bg-slate-600 text-white font-semibold px-2 py-0.5 rounded transition-colors"
+                      title="Manage Group Settings"
+                    >
+                      Manage
+                    </button>
+                  )}
                 </span>
               </div>
               <span className="text-[10px] text-gray-200 flex items-center gap-1 font-medium mt-0.5">
-                {isOnline ? (
+                {isGroup ? (
+                  <span>{selectedConversation.participants?.length || 0} members</span>
+                ) : isOnline ? (
                   <span className="text-green-300 font-semibold flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-300 inline-block animate-pulse"></span> Online
                   </span>
@@ -137,6 +158,14 @@ const MessageContainer = () => {
 
           <Messages />
           <MessageInput />
+
+          {isGroup && (
+            <ManageGroupModal
+              isOpen={isManageOpen}
+              onClose={() => setIsManageOpen(false)}
+              group={selectedConversation}
+            />
+          )}
         </>
       )}
     </div>

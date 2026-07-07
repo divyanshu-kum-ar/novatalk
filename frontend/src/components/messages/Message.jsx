@@ -146,17 +146,18 @@ const Message = ({ message }) => {
     }
   };
 
-  const fromMe = message.senderId === authUser._id;
+  const senderIdStr = typeof message.senderId === "object" && message.senderId !== null ? message.senderId._id : message.senderId;
+  const fromMe = String(senderIdStr) === String(authUser._id);
   const formattedTime = extractTime(message.createdAt);
   const chatClassName = fromMe ? "chat-end" : "chat-start";
   const profilePic = fromMe
     ? authUser.profilePic
-    : selectedConversation?.profilePic;
+    : (typeof message.senderId === "object" && message.senderId !== null ? message.senderId.profilePic : selectedConversation?.profilePic);
   const bubbleBgColor = fromMe ? "bg-blue-500" : "";
 
   const shakeClass = message.shouldShake ? "shake" : "";
 
-  const senderGender = fromMe ? authUser.gender : selectedConversation?.gender;
+  const senderGender = fromMe ? authUser.gender : (typeof message.senderId === "object" && message.senderId !== null ? message.senderId.gender : selectedConversation?.gender);
 
   const profilePicSrc = (profilePic && !profilePic.includes("avatar.iran.liara.run"))
     ? profilePic
@@ -171,7 +172,7 @@ const Message = ({ message }) => {
   return (
     <div id={`msg-${message._id}`} className={`chat ${chatClassName}`}>
       <div className="chat-image avatar">
-        <div className="w-10 rounded-full">
+        <div className="w-10 rounded-full bg-slate-700 flex items-center justify-center">
           <img
             alt="Tailwind CSS chat bubble component"
             src={profilePicSrc}
@@ -192,6 +193,11 @@ const Message = ({ message }) => {
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
+        {selectedConversation?.isGroup && !fromMe && (
+          <span className="text-xs text-sky-300 font-semibold block mb-0.5 select-none">
+            {typeof message.senderId === "object" && message.senderId !== null ? message.senderId.fullName : "User"}
+          </span>
+        )}
         {showPicker && (
           <div
             className={`absolute bottom-[105%] ${fromMe ? "right-0" : "left-0"} mb-1 bg-gray-800 border border-gray-700 rounded-full py-1 px-2.5 flex gap-1.5 shadow-xl z-50 animate-fade-in`}
@@ -242,7 +248,7 @@ const Message = ({ message }) => {
             className="cursor-pointer mb-1 p-2 bg-black bg-opacity-20 hover:bg-opacity-30 border-l-4 border-blue-500 rounded text-xs text-gray-300 flex flex-col gap-0.5"
           >
             <span className="font-semibold text-blue-400">
-              {message.replyTo.senderId === authUser._id ? "You" : selectedConversation?.fullName}
+              {message.replyTo.senderId === authUser._id ? "You" : (selectedConversation?.isGroup ? "User" : selectedConversation?.fullName)}
             </span>
             <span className="truncate max-w-[200px]">
               {message.replyTo.image ? "📷 Photo" : message.replyTo.file ? `📄 ${message.replyTo.fileName}` : message.replyTo.message}
