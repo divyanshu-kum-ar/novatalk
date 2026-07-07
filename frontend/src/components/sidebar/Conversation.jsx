@@ -58,7 +58,6 @@ const Conversation = ({ conversation, lastIdx, emoji }) => {
                   {unreadCount}
                 </span>
               )}
-              <span className="text-xl">{emoji}</span>
             </div>
           </div>
         </div>

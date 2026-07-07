@@ -2,7 +2,7 @@ import { useAuthContext } from "../../context/AuthContext";
 import { extractTime } from "../../utils/extractTime";
 import useConversation from "../../zustand/useConversation";
 import { useState } from "react";
-import { BsDownload, BsFileEarmarkPdf, BsFileEarmarkWord, BsFileEarmarkText, BsFileEarmarkZip, BsFileEarmark, BsThreeDotsVertical } from "react-icons/bs";
+import { BsDownload, BsFileEarmarkPdf, BsFileEarmarkWord, BsFileEarmarkText, BsFileEarmarkZip, BsFileEarmark, BsThreeDotsVertical, BsTelephoneInboundFill, BsTelephoneOutboundFill, BsTelephoneXFill, BsCameraVideoFill } from "react-icons/bs";
 import toast from "react-hot-toast";
 
 const formatBytes = (bytes, decimals = 2) => {
@@ -154,42 +154,75 @@ const Message = ({ message }) => {
     const isCompleted = message.callLog?.type === "completed";
     const isVideo = message.callLog?.callType === "video";
     
-    let logText = "";
-    let icon = isVideo ? "🎥" : "📞";
-    let iconColor = isVideo ? "text-teal-400" : "text-sky-400";
-    
-    if (isCompleted) {
-      const duration = message.callLog.duration || 0;
-      const mins = Math.floor(duration / 60);
-      const secs = duration % 60;
-      const durationStr = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-      logText = isVideo ? `Video call ended (${durationStr})` : `Call ended (${durationStr})`;
-      icon = isVideo ? "🎥" : "📞";
-      iconColor = isVideo ? "text-teal-400" : "text-sky-400";
-    } else {
-      if (fromMe) {
-        logText = isVideo ? "Outgoing video call" : "Outgoing voice call";
-        icon = isVideo ? "🎥" : "📞";
-        iconColor = "text-gray-400";
+    let titleText = "";
+    let statusText = "";
+    let IconComponent = null;
+    let iconBgColor = "";
+    let iconColor = "";
+
+    const duration = message.callLog?.duration || 0;
+    const mins = Math.floor(duration / 60);
+    const secs = duration % 60;
+    const durationStr = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+
+    if (isVideo) {
+      if (isCompleted) {
+        titleText = fromMe ? "Outgoing video call" : "Incoming video call";
+        statusText = `Video call ended (${durationStr})`;
+        IconComponent = BsCameraVideoFill;
+        iconBgColor = fromMe ? "bg-blue-500/20" : "bg-emerald-500/20";
+        iconColor = fromMe ? "text-blue-400" : "text-emerald-400";
       } else {
-        logText = isVideo ? "Missed video call" : "Missed call";
-        icon = "❌";
-        iconColor = "text-red-500";
+        if (fromMe) {
+          titleText = "Outgoing video call";
+          statusText = "Unanswered";
+          IconComponent = BsCameraVideoFill;
+          iconBgColor = "bg-gray-700/30";
+          iconColor = "text-gray-400";
+        } else {
+          titleText = "Missed video call";
+          statusText = "Missed call";
+          IconComponent = BsCameraVideoFill;
+          iconBgColor = "bg-red-500/20";
+          iconColor = "text-red-400";
+        }
+      }
+    } else {
+      if (isCompleted) {
+        titleText = fromMe ? "Outgoing voice call" : "Incoming voice call";
+        statusText = `Call ended (${durationStr})`;
+        IconComponent = fromMe ? BsTelephoneOutboundFill : BsTelephoneInboundFill;
+        iconBgColor = fromMe ? "bg-blue-500/20" : "bg-emerald-500/20";
+        iconColor = fromMe ? "text-blue-400" : "text-emerald-400";
+      } else {
+        if (fromMe) {
+          titleText = "Outgoing voice call";
+          statusText = "Unanswered";
+          IconComponent = BsTelephoneOutboundFill;
+          iconBgColor = "bg-gray-700/30";
+          iconColor = "text-gray-400";
+        } else {
+          titleText = "Missed voice call";
+          statusText = "Missed call";
+          IconComponent = BsTelephoneXFill;
+          iconBgColor = "bg-red-500/20";
+          iconColor = "text-red-400";
+        }
       }
     }
 
     return (
-      <div className="flex justify-center my-3 w-full animate-fade-in">
-        <div className="flex items-center gap-2.5 px-4 py-2 bg-gray-800/40 border border-gray-700/60 rounded-2xl max-w-[80%] shadow-sm">
-          <span className={`${iconColor} text-sm flex-shrink-0`}>{icon}</span>
-          <div className="flex flex-col min-w-0">
-            <span className="text-xs font-semibold text-gray-200 tracking-wide">
-              {fromMe 
-                ? (isVideo ? "Outgoing video call" : "Outgoing voice call") 
-                : (isVideo ? "Incoming video call" : "Incoming voice call")}
+      <div className="flex justify-center my-2.5 w-full select-none animate-fade-in">
+        <div className="flex items-center gap-3.5 px-4 py-2.5 bg-gray-800/30 backdrop-blur-md border border-gray-700/30 rounded-2xl max-w-[85%] sm:max-w-[70%] shadow-lg shadow-black/10 transition-all hover:bg-gray-800/40">
+          <div className={`w-8 h-8 rounded-xl ${iconBgColor} flex items-center justify-center flex-shrink-0 transition-colors`}>
+            {IconComponent && <IconComponent className={iconColor} size={15} />}
+          </div>
+          <div className="flex flex-col min-w-0 pr-1">
+            <span className="text-xs font-semibold text-gray-100 tracking-wide">
+              {titleText}
             </span>
-            <span className="text-[10px] text-gray-400 font-medium mt-0.5 flex items-center gap-1.5">
-              <span>{logText}</span>
+            <span className="text-[10px] text-gray-400/90 font-medium mt-0.5 flex items-center gap-1.5 whitespace-nowrap">
+              <span>{statusText}</span>
               <span className="w-1 h-1 rounded-full bg-gray-600 inline-block"></span>
               <span>{formattedTime}</span>
             </span>

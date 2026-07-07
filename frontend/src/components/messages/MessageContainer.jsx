@@ -3,6 +3,7 @@ import { useState } from "react";
 import MessageInput from "./MessageInput";
 import Messages from "./Messages";
 import { TiMessages } from "react-icons/ti";
+import { BsTelephoneFill, BsCameraVideoFill } from "react-icons/bs";
 import useConversation from "./../../zustand/useConversation";
 import { useEffect } from "react";
 import { useAuthContext } from "../../context/AuthContext";
@@ -158,22 +159,22 @@ const MessageContainer = () => {
                 </span>
               )}
               {!isGroup && (
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2.5">
                   <button
                     type="button"
                     onClick={() => startCall(selectedConversation._id, selectedConversation.fullName, selectedConversation.profilePic, "voice")}
-                    className="btn btn-circle btn-sm bg-sky-600 hover:bg-sky-500 border-none text-white transition-all shadow-md active:scale-95 flex items-center justify-center font-bold text-base"
+                    className="w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-500 hover:scale-105 active:scale-95 text-white flex items-center justify-center transition-all duration-200 shadow-md"
                     title="Start Voice Call"
                   >
-                    📞
+                    <BsTelephoneFill size={13} />
                   </button>
                   <button
                     type="button"
                     onClick={() => startCall(selectedConversation._id, selectedConversation.fullName, selectedConversation.profilePic, "video")}
-                    className="btn btn-circle btn-sm bg-teal-600 hover:bg-teal-500 border-none text-white transition-all shadow-md active:scale-95 flex items-center justify-center font-bold text-base"
+                    className="w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-500 hover:scale-105 active:scale-95 text-white flex items-center justify-center transition-all duration-200 shadow-md"
                     title="Start Video Call"
                   >
-                    🎥
+                    <BsCameraVideoFill size={13} />
                   </button>
                 </div>
               )}
