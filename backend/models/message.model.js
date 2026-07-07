@@ -65,6 +65,11 @@ const messageSchema = new mongoose.Schema(
       duration: {
         type: Number,
       },
+      callType: {
+        type: String,
+        enum: ["voice", "video"],
+        default: "voice",
+      },
     },
   },
   { timestamps: true }

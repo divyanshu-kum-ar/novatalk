@@ -152,26 +152,27 @@ const Message = ({ message }) => {
 
   if (message.isCallLog) {
     const isCompleted = message.callLog?.type === "completed";
+    const isVideo = message.callLog?.callType === "video";
     
     let logText = "";
-    let icon = "📞";
-    let iconColor = "text-sky-400";
+    let icon = isVideo ? "🎥" : "📞";
+    let iconColor = isVideo ? "text-teal-400" : "text-sky-400";
     
     if (isCompleted) {
       const duration = message.callLog.duration || 0;
       const mins = Math.floor(duration / 60);
       const secs = duration % 60;
       const durationStr = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-      logText = `Call ended (${durationStr})`;
-      icon = "📞";
-      iconColor = "text-sky-400";
+      logText = isVideo ? `Video call ended (${durationStr})` : `Call ended (${durationStr})`;
+      icon = isVideo ? "🎥" : "📞";
+      iconColor = isVideo ? "text-teal-400" : "text-sky-400";
     } else {
       if (fromMe) {
-        logText = "Outgoing voice call";
-        icon = "📞";
+        logText = isVideo ? "Outgoing video call" : "Outgoing voice call";
+        icon = isVideo ? "🎥" : "📞";
         iconColor = "text-gray-400";
       } else {
-        logText = "Missed call";
+        logText = isVideo ? "Missed video call" : "Missed call";
         icon = "❌";
         iconColor = "text-red-500";
       }
@@ -183,7 +184,9 @@ const Message = ({ message }) => {
           <span className={`${iconColor} text-sm flex-shrink-0`}>{icon}</span>
           <div className="flex flex-col min-w-0">
             <span className="text-xs font-semibold text-gray-200 tracking-wide">
-              {fromMe ? "Outgoing voice call" : "Incoming voice call"}
+              {fromMe 
+                ? (isVideo ? "Outgoing video call" : "Outgoing voice call") 
+                : (isVideo ? "Incoming video call" : "Incoming voice call")}
             </span>
             <span className="text-[10px] text-gray-400 font-medium mt-0.5 flex items-center gap-1.5">
               <span>{logText}</span>

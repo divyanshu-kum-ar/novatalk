@@ -20,6 +20,7 @@ export const CallContextProvider = ({ children }) => {
   const [outgoingCall, setOutgoingCall] = useState(null);
   const [activeCall, setActiveCall] = useState(null);
   const [isMuted, setIsMuted] = useState(false);
+  const [isCameraOff, setIsCameraOff] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
 
   const peerConnectionRef = useRef(null);
@@ -27,6 +28,10 @@ export const CallContextProvider = ({ children }) => {
   const remoteAudioRef = useRef(null);
   const timerRef = useRef(null);
   const pendingIceCandidates = useRef([]);
+
+  // Video references
+  const localVideoRef = useRef(null);
+  const remoteVideoRef = useRef(null);
 
   // Refs to prevent closure race conditions
   const incomingCallRef = useRef(incomingCall);
@@ -53,12 +58,13 @@ export const CallContextProvider = ({ children }) => {
   // Save call log in database
   const saveCallLog = async (receiverId, type, duration) => {
     try {
+      const callType = activeCallRef.current?.isVideo || outgoingCallRef.current?.isVideo ? "video" : "voice";
       const res = await fetch("/api/messages/call-log", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ receiverId, type, duration }),
+        body: JSON.stringify({ receiverId, type, duration, callType }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -90,44 +96,58 @@ export const CallContextProvider = ({ children }) => {
     if (remoteAudioRef.current) {
       remoteAudioRef.current.srcObject = null;
     }
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = null;
+    }
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = null;
+    }
     pendingIceCandidates.current = [];
     setIncomingCall(null);
     setOutgoingCall(null);
     setActiveCall(null);
     setIsMuted(false);
+    setIsCameraOff(false);
     setCallDuration(0);
   };
 
-  // Start call
-  const startCall = async (receiverId, receiverName, receiverAvatar) => {
+  // Start call (callType: "voice" or "video")
+  const startCall = async (receiverId, receiverName, receiverAvatar, callType = "voice") => {
     if (incomingCallRef.current || outgoingCallRef.current || activeCallRef.current) {
       toast.error("You are already in a call or have a pending call");
       return;
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      const isVideoCall = callType === "video";
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: isVideoCall,
+      });
       localStreamRef.current = stream;
 
       setOutgoingCall({
         to: receiverId,
         receiverName,
         receiverAvatar,
+        isVideo: isVideoCall,
       });
 
       console.log("[CLIENT] startCall emitting voice-call:", {
         receiverId,
         callerName: authUser.fullName,
         socketId: socket?.id,
+        isVideo: isVideoCall,
       });
 
       socket?.emit("voice-call", {
         userToCall: receiverId,
         callerName: authUser.fullName,
         callerAvatar: authUser.profilePic,
+        isVideo: isVideoCall,
       });
     } catch (err) {
-      toast.error("Microphone access is required to make voice calls.");
+      toast.error("Media access is required to make calls.");
       resetCallState();
     }
   };
@@ -138,7 +158,11 @@ export const CallContextProvider = ({ children }) => {
     if (!currentIncoming) return;
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      const isVideoCall = currentIncoming.isVideo;
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: isVideoCall,
+      });
       localStreamRef.current = stream;
 
       setActiveCall({
@@ -146,13 +170,23 @@ export const CallContextProvider = ({ children }) => {
         partnerName: currentIncoming.callerName,
         partnerAvatar: currentIncoming.callerAvatar,
         isCaller: false,
+        isVideo: isVideoCall,
       });
       setIncomingCall(null);
+
+      // Bind local video feed
+      if (isVideoCall) {
+        setTimeout(() => {
+          if (localVideoRef.current) {
+            localVideoRef.current.srcObject = stream;
+          }
+        }, 100);
+      }
 
       socket?.emit("accept-call", { to: currentIncoming.from });
       startDurationTimer();
     } catch (err) {
-      toast.error("Microphone access is required to accept voice calls.");
+      toast.error("Media access is required to accept calls.");
       socket?.emit("reject-call", { to: currentIncoming.from });
       resetCallState();
     }
@@ -197,6 +231,16 @@ export const CallContextProvider = ({ children }) => {
     }
   };
 
+  // Toggle Camera
+  const toggleCamera = () => {
+    if (localStreamRef.current) {
+      localStreamRef.current.getVideoTracks().forEach((track) => {
+        track.enabled = !track.enabled;
+      });
+      setIsCameraOff(!isCameraOff);
+    }
+  };
+
   // Timer
   const startDurationTimer = () => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -230,12 +274,20 @@ export const CallContextProvider = ({ children }) => {
     };
 
     pc.ontrack = (event) => {
-      if (!remoteAudioRef.current) {
-        const audio = document.createElement("audio");
-        audio.autoplay = true;
-        remoteAudioRef.current = audio;
+      console.log("[CLIENT] ontrack received stream:", event.streams[0]);
+      const isVideoCall = activeCallRef.current?.isVideo;
+      if (isVideoCall) {
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = event.streams[0];
+        }
+      } else {
+        if (!remoteAudioRef.current) {
+          const audio = document.createElement("audio");
+          audio.autoplay = true;
+          remoteAudioRef.current = audio;
+        }
+        remoteAudioRef.current.srcObject = event.streams[0];
       }
-      remoteAudioRef.current.srcObject = event.streams[0];
     };
 
     return pc;
@@ -245,14 +297,14 @@ export const CallContextProvider = ({ children }) => {
   useEffect(() => {
     if (!socket) return;
 
-    socket.on("voice-call", ({ from, callerName, callerAvatar }) => {
-      console.log("[CLIENT] received voice-call event:", { from, callerName, callerAvatar });
+    socket.on("voice-call", ({ from, callerName, callerAvatar, isVideo }) => {
+      console.log("[CLIENT] received voice-call event:", { from, callerName, callerAvatar, isVideo });
       if (incomingCallRef.current || outgoingCallRef.current || activeCallRef.current) {
         console.log("[CLIENT] already in call, rejecting:", from);
         socket.emit("reject-call", { to: from });
         return;
       }
-      setIncomingCall({ from, callerName, callerAvatar });
+      setIncomingCall({ from, callerName, callerAvatar, isVideo });
     });
 
     socket.on("accept-call", async ({ from }) => {
@@ -265,9 +317,19 @@ export const CallContextProvider = ({ children }) => {
         partnerName: currentOutgoing.receiverName,
         partnerAvatar: currentOutgoing.receiverAvatar,
         isCaller: true,
+        isVideo: currentOutgoing.isVideo,
       });
       setOutgoingCall(null);
       startDurationTimer();
+
+      // Bind local video feed
+      if (currentOutgoing.isVideo) {
+        setTimeout(() => {
+          if (localVideoRef.current && localStreamRef.current) {
+            localVideoRef.current.srcObject = localStreamRef.current;
+          }
+        }, 100);
+      }
 
       const pc = createPeerConnection(from);
       try {
@@ -370,12 +432,16 @@ export const CallContextProvider = ({ children }) => {
         outgoingCall,
         activeCall,
         isMuted,
+        isCameraOff,
         callDuration,
         startCall,
         acceptCall,
         rejectCall,
         endCall,
         toggleMute,
+        toggleCamera,
+        localVideoRef,
+        remoteVideoRef,
       }}
     >
       {children}

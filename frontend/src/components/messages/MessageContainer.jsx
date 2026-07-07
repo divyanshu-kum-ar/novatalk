@@ -158,14 +158,24 @@ const MessageContainer = () => {
                 </span>
               )}
               {!isGroup && (
-                <button
-                  type="button"
-                  onClick={() => startCall(selectedConversation._id, selectedConversation.fullName, selectedConversation.profilePic)}
-                  className="btn btn-circle btn-sm bg-sky-600 hover:bg-sky-500 border-none text-white transition-all shadow-md active:scale-95 flex items-center justify-center font-bold text-base"
-                  title="Start Voice Call"
-                >
-                  📞
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => startCall(selectedConversation._id, selectedConversation.fullName, selectedConversation.profilePic, "voice")}
+                    className="btn btn-circle btn-sm bg-sky-600 hover:bg-sky-500 border-none text-white transition-all shadow-md active:scale-95 flex items-center justify-center font-bold text-base"
+                    title="Start Voice Call"
+                  >
+                    📞
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => startCall(selectedConversation._id, selectedConversation.fullName, selectedConversation.profilePic, "video")}
+                    className="btn btn-circle btn-sm bg-teal-600 hover:bg-teal-500 border-none text-white transition-all shadow-md active:scale-95 flex items-center justify-center font-bold text-base"
+                    title="Start Video Call"
+                  >
+                    🎥
+                  </button>
+                </div>
               )}
             </div>
           </div>

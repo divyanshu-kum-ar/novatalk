@@ -54,19 +54,21 @@ io.on("connection", (socket) => {
   io.emit("getOnlineUsers", Object.keys(userSocketMap));
 
   // Voice Call Signaling
-  socket.on("voice-call", ({ userToCall, callerName, callerAvatar }) => {
+  socket.on("voice-call", ({ userToCall, callerName, callerAvatar, isVideo }) => {
     const receiverSocketId = getReceiverSocketId(userToCall);
     console.log("[SERVER] voice-call event:", {
       callerId: userId,
       receiverId: userToCall,
       senderSocketId: socket.id,
       receiverSocketId,
+      isVideo,
     });
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("voice-call", {
         from: userId,
         callerName,
         callerAvatar,
+        isVideo,
       });
       console.log("[SERVER] emitted voice-call to receiver:", receiverSocketId);
     } else {

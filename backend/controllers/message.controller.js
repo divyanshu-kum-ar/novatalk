@@ -380,7 +380,7 @@ export const toggleReaction = async (req, res) => {
 
 export const createCallLog = async (req, res) => {
   try {
-    const { receiverId, type, duration } = req.body;
+    const { receiverId, type, duration, callType } = req.body;
     const senderId = req.user._id;
 
     let conversation = await Conversation.findOne({
@@ -396,18 +396,19 @@ export const createCallLog = async (req, res) => {
 
     const receiverSocketId = getReceiverSocketId(receiverId);
 
+    const isVideo = callType === "video";
     let messageText = "";
     if (type === "completed") {
       const mins = Math.floor(duration / 60);
       const secs = duration % 60;
       const durationStr = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-      messageText = `Call ended (${durationStr})`;
+      messageText = isVideo ? `Video call ended (${durationStr})` : `Call ended (${durationStr})`;
     } else if (type === "rejected") {
-      messageText = "Call rejected";
+      messageText = isVideo ? "Video call rejected" : "Call rejected";
     } else if (type === "missed") {
-      messageText = "Missed call";
+      messageText = isVideo ? "Missed video call" : "Missed call";
     } else if (type === "cancelled") {
-      messageText = "Cancelled call";
+      messageText = isVideo ? "Cancelled video call" : "Cancelled call";
     }
 
     const newMessage = new Message({
@@ -418,6 +419,7 @@ export const createCallLog = async (req, res) => {
       callLog: {
         type,
         duration,
+        callType: callType || "voice",
       },
       status: receiverSocketId ? "delivered" : "sent",
     });
