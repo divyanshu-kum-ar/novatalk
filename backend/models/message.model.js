@@ -53,6 +53,19 @@ const messageSchema = new mongoose.Schema(
         },
       },
     ],
+    isCallLog: {
+      type: Boolean,
+      default: false,
+    },
+    callLog: {
+      type: {
+        type: String,
+        enum: ["completed", "rejected", "missed", "cancelled"],
+      },
+      duration: {
+        type: Number,
+      },
+    },
   },
   { timestamps: true }
 );

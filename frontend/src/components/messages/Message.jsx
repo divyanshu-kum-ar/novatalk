@@ -149,6 +149,53 @@ const Message = ({ message }) => {
   const senderIdStr = typeof message.senderId === "object" && message.senderId !== null ? message.senderId._id : message.senderId;
   const fromMe = String(senderIdStr) === String(authUser._id);
   const formattedTime = extractTime(message.createdAt);
+
+  if (message.isCallLog) {
+    const isCompleted = message.callLog?.type === "completed";
+    
+    let logText = "";
+    let icon = "📞";
+    let iconColor = "text-sky-400";
+    
+    if (isCompleted) {
+      const duration = message.callLog.duration || 0;
+      const mins = Math.floor(duration / 60);
+      const secs = duration % 60;
+      const durationStr = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+      logText = `Call ended (${durationStr})`;
+      icon = "📞";
+      iconColor = "text-sky-400";
+    } else {
+      if (fromMe) {
+        logText = "Outgoing voice call";
+        icon = "📞";
+        iconColor = "text-gray-400";
+      } else {
+        logText = "Missed call";
+        icon = "❌";
+        iconColor = "text-red-500";
+      }
+    }
+
+    return (
+      <div className="flex justify-center my-3 w-full animate-fade-in">
+        <div className="flex items-center gap-2.5 px-4 py-2 bg-gray-800/40 border border-gray-700/60 rounded-2xl max-w-[80%] shadow-sm">
+          <span className={`${iconColor} text-sm flex-shrink-0`}>{icon}</span>
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs font-semibold text-gray-200 tracking-wide">
+              {fromMe ? "Outgoing voice call" : "Incoming voice call"}
+            </span>
+            <span className="text-[10px] text-gray-400 font-medium mt-0.5 flex items-center gap-1.5">
+              <span>{logText}</span>
+              <span className="w-1 h-1 rounded-full bg-gray-600 inline-block"></span>
+              <span>{formattedTime}</span>
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const chatClassName = fromMe ? "chat-end" : "chat-start";
   const profilePic = fromMe
     ? authUser.profilePic

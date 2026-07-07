@@ -377,3 +377,68 @@ export const toggleReaction = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
+export const createCallLog = async (req, res) => {
+  try {
+    const { receiverId, type, duration } = req.body;
+    const senderId = req.user._id;
+
+    let conversation = await Conversation.findOne({
+      participants: { $all: [senderId, receiverId] },
+      isGroup: { $ne: true }
+    });
+
+    if (!conversation) {
+      conversation = await Conversation.create({
+        participants: [senderId, receiverId],
+      });
+    }
+
+    const receiverSocketId = getReceiverSocketId(receiverId);
+
+    let messageText = "";
+    if (type === "completed") {
+      const mins = Math.floor(duration / 60);
+      const secs = duration % 60;
+      const durationStr = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+      messageText = `Call ended (${durationStr})`;
+    } else if (type === "rejected") {
+      messageText = "Call rejected";
+    } else if (type === "missed") {
+      messageText = "Missed call";
+    } else if (type === "cancelled") {
+      messageText = "Cancelled call";
+    }
+
+    const newMessage = new Message({
+      senderId,
+      receiverId,
+      message: messageText,
+      isCallLog: true,
+      callLog: {
+        type,
+        duration,
+      },
+      status: receiverSocketId ? "delivered" : "sent",
+    });
+
+    conversation.messages.push(newMessage._id);
+    await Promise.all([conversation.save(), newMessage.save()]);
+
+    await newMessage.populate({
+      path: "senderId",
+      select: "username fullName profilePic gender"
+    });
+
+    const messageResponse = newMessage.toObject();
+
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("newMessage", messageResponse);
+    }
+
+    res.status(201).json(messageResponse);
+  } catch (error) {
+    console.log("Error in createCallLog:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};

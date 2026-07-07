@@ -6,6 +6,7 @@ import SignUp from "./pages/signup/SignUp";
 import Profile from "./pages/profile/Profile";
 import { Toaster } from "react-hot-toast";
 import { useAuthContext } from "./context/AuthContext";
+import CallOverlay from "./components/messages/CallOverlay";
 
 function App() {
   const { authUser } = useAuthContext();
@@ -31,6 +32,7 @@ function App() {
         />
       </Routes>
       <Toaster />
+      <CallOverlay />
     </div>
   );
 }

@@ -7,11 +7,13 @@ import useConversation from "./../../zustand/useConversation";
 import { useEffect } from "react";
 import { useAuthContext } from "../../context/AuthContext";
 import ManageGroupModal from "./ManageGroupModal";
+import { useCallContext } from "../../context/CallContext";
 
 const MessageContainer = () => {
   const { authUser } = useAuthContext();
   const { selectedConversation, setSelectedConversation } = useConversation();
   const { socket, onlineUsers } = useSocketContext();
+  const { startCall } = useCallContext();
   const [isTyping, setIsTyping] = useState(false);
   const [tick, setTick] = useState(0);
   const [isManageOpen, setIsManageOpen] = useState(false);
@@ -149,11 +151,23 @@ const MessageContainer = () => {
                 )}
               </span>
             </div>
-            {isTyping && (
-              <span className="text-xs text-sky-200 animate-pulse font-medium pr-2">
-                typing...
-              </span>
-            )}
+            <div className="flex items-center gap-4">
+              {isTyping && (
+                <span className="text-xs text-sky-200 animate-pulse font-medium pr-1">
+                  typing...
+                </span>
+              )}
+              {!isGroup && (
+                <button
+                  type="button"
+                  onClick={() => startCall(selectedConversation._id, selectedConversation.fullName, selectedConversation.profilePic)}
+                  className="btn btn-circle btn-sm bg-sky-600 hover:bg-sky-500 border-none text-white transition-all shadow-md active:scale-95 flex items-center justify-center font-bold text-base"
+                  title="Start Voice Call"
+                >
+                  📞
+                </button>
+              )}
+            </div>
           </div>
 
           <Messages />
