@@ -78,7 +78,11 @@ export const sendMessage = async (req, res) => {
     if (newMessage.replyTo) {
       await newMessage.populate({
         path: "replyTo",
-        select: "message image file fileName fileSize senderId"
+        select: "message image file fileName fileSize senderId",
+        populate: {
+          path: "senderId",
+          select: "username fullName"
+        }
       });
     }
 
@@ -126,7 +130,11 @@ export const getMessages = async (req, res) => {
         },
         {
           path: "replyTo",
-          select: "message image file fileName fileSize senderId"
+          select: "message image file fileName fileSize senderId",
+          populate: {
+            path: "senderId",
+            select: "username fullName"
+          }
         },
         {
           path: "reactions.userId",
@@ -149,7 +157,11 @@ export const getMessages = async (req, res) => {
           },
           {
             path: "replyTo",
-            select: "message image file fileName fileSize senderId"
+            select: "message image file fileName fileSize senderId",
+            populate: {
+              path: "senderId",
+              select: "username fullName"
+            }
           },
           {
             path: "reactions.userId",

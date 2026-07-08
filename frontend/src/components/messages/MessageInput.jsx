@@ -64,7 +64,7 @@ const MessageInput = () => {
   const getReplyingSnippet = (msg) => {
     if (!msg) return "";
     if (msg.image) return "📷 Photo";
-    if (msg.file) return `📄 ${msg.fileName}`;
+    if (msg.file) return "📎 File";
     return msg.message || "";
   };
 
@@ -327,7 +327,13 @@ const MessageInput = () => {
         <div className="flex justify-between items-center bg-gray-800 px-3 py-2 rounded-lg text-xs text-gray-400 border-l-4 border-blue-500 shadow-md">
           <div className="flex flex-col min-w-0 flex-1">
             <span className="font-semibold text-blue-400">
-              Replying to {replyingTo.senderId === authUser._id ? "You" : selectedConversation?.fullName}
+              Replying to {
+                (replyingTo.senderId?._id || replyingTo.senderId) === authUser._id 
+                  ? "You" 
+                  : (typeof replyingTo.senderId === "object" && replyingTo.senderId !== null
+                      ? (replyingTo.senderId.fullName || replyingTo.senderId.username || "User")
+                      : (selectedConversation?.fullName || "User"))
+              }
             </span>
             <span className="truncate max-w-[240px] text-gray-300">
               {getReplyingSnippet(replyingTo)}

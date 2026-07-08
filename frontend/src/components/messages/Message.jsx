@@ -271,7 +271,7 @@ const Message = ({ message }) => {
         onMouseLeave={handleMouseLeave}
         onContextMenu={(e) => {
           e.preventDefault();
-          setShowPicker(true);
+          setReplyingTo(message);
         }}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
@@ -322,19 +322,31 @@ const Message = ({ message }) => {
               const element = document.getElementById(`msg-${message.replyTo._id}`);
               if (element) {
                 element.scrollIntoView({ behavior: "smooth", block: "center" });
-                element.classList.add("bg-blue-900", "bg-opacity-30", "transition-all", "duration-300");
-                setTimeout(() => {
-                  element.classList.remove("bg-blue-900", "bg-opacity-30");
-                }, 1500);
+                const bubble = element.querySelector(".chat-bubble");
+                if (bubble) {
+                  bubble.classList.add("ring-4", "ring-blue-400", "transition-all", "duration-300");
+                  setTimeout(() => {
+                    bubble.classList.remove("ring-4", "ring-blue-400");
+                  }, 1500);
+                }
               }
             }}
             className="cursor-pointer mb-1 p-2 bg-black bg-opacity-20 hover:bg-opacity-30 border-l-4 border-blue-500 rounded text-xs text-gray-300 flex flex-col gap-0.5"
           >
             <span className="font-semibold text-blue-400">
-              {message.replyTo.senderId === authUser._id ? "You" : (selectedConversation?.isGroup ? "User" : selectedConversation?.fullName)}
+              {
+                (() => {
+                  const replyToSenderId = message.replyTo.senderId?._id || message.replyTo.senderId;
+                  return replyToSenderId === authUser._id 
+                    ? "You" 
+                    : (typeof message.replyTo.senderId === "object" && message.replyTo.senderId !== null
+                        ? (message.replyTo.senderId.fullName || message.replyTo.senderId.username || "User")
+                        : (selectedConversation?.isGroup ? "User" : selectedConversation?.fullName));
+                })()
+              }
             </span>
             <span className="truncate max-w-[200px]">
-              {message.replyTo.image ? "📷 Photo" : message.replyTo.file ? `📄 ${message.replyTo.fileName}` : message.replyTo.message}
+              {message.replyTo.image ? "📷 Photo" : message.replyTo.file ? "📎 File" : message.replyTo.message}
             </span>
           </div>
         )}
