@@ -14,6 +14,8 @@ const useConversation = create((set) => ({
   setEditingMessage: (editingMessage) => set({ editingMessage }),
   replyingTo: null,
   setReplyingTo: (replyingTo) => set({ replyingTo }),
+  searchQuery: "",
+  setSearchQuery: (searchQuery) => set({ searchQuery }),
 }));
 
 export default useConversation;

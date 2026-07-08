@@ -53,9 +53,23 @@ const getDefaultAvatar = (gender) => {
 
 const Message = ({ message }) => {
   const { authUser } = useAuthContext();
-  const { selectedConversation, messages, setMessages, setEditingMessage, setReplyingTo } = useConversation();
+  const { selectedConversation, messages, setMessages, setEditingMessage, setReplyingTo, searchQuery } = useConversation();
   const [showLightbox, setShowLightbox] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+
+  const highlightText = (text, query) => {
+    if (!query || !query.trim() || !text) return text;
+    const parts = text.split(new RegExp(`(${query.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')})`, 'gi'));
+    return (
+      <>
+        {parts.map((part, index) => 
+          part.toLowerCase() === query.toLowerCase()
+            ? <mark key={index} className="bg-yellow-500 text-black rounded px-0.5">{part}</mark>
+            : part
+        )}
+      </>
+    );
+  };
 
   let pressTimer;
   const handleTouchStart = () => {
@@ -379,7 +393,7 @@ const Message = ({ message }) => {
             </div>
             <div className="flex flex-col min-w-0 flex-1">
               <span className="text-sm font-semibold text-white truncate" title={message.fileName}>
-                {message.fileName}
+                {highlightText(message.fileName, searchQuery)}
               </span>
               <span className="text-xs text-gray-400">
                 {formatBytes(message.fileSize)}
@@ -396,7 +410,7 @@ const Message = ({ message }) => {
         )}
         {message.message && (
           <span className={`break-words ${message.isDeletedForEveryone ? "italic opacity-60 font-normal select-none" : ""}`}>
-            {message.message}
+            {message.isDeletedForEveryone ? message.message : highlightText(message.message, searchQuery)}
             {message.edited && !message.isDeletedForEveryone && <span className="text-[9px] opacity-60 ml-1.5 select-none font-normal">(edited)</span>}
           </span>
         )}
