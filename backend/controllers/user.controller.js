@@ -7,16 +7,51 @@ export const getUsers = async (req, res) => {
 
     const allUsers = await User.find({ _id: { $ne: loggedInUser } }).select(
       "-password"
-    ); // { _id: { $ne: loggedInUser }.select("-password") gives all the users expect the loggedin user and without the password
+    );
 
     const groups = await Conversation.find({
       isGroup: true,
       participants: loggedInUser,
     }).populate("participants", "-password");
 
-    res.status(200).json([...groups, ...allUsers]);
+    const userObj = await User.findById(loggedInUser);
+    const pinnedChatIds = userObj ? (userObj.pinnedConversations || []) : [];
+
+    res.status(200).json({
+      conversations: [...groups, ...allUsers],
+      pinnedChatIds,
+    });
   } catch (error) {
     console.log("Error in getUsers controller:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+export const togglePinChat = async (req, res) => {
+  try {
+    const { id: chatId } = req.params;
+    const userId = req.user._id;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (!user.pinnedConversations) {
+      user.pinnedConversations = [];
+    }
+
+    const index = user.pinnedConversations.indexOf(chatId);
+    if (index === -1) {
+      user.pinnedConversations.push(chatId);
+    } else {
+      user.pinnedConversations.splice(index, 1);
+    }
+
+    await user.save();
+    res.status(200).json(user.pinnedConversations);
+  } catch (error) {
+    console.log("Error in togglePinChat controller:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 };

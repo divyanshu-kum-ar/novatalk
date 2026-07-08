@@ -5,9 +5,8 @@ import useGetConversations from "./../../hooks/useGetConversations";
 import useConversation from "../../zustand/useConversation";
 
 const Conversations = () => {
-  // here conversations are the users to show at the sidebar
   const { loading, conversations } = useGetConversations();
-  const { selectedConversation, unreadCounts, setUnreadCounts } = useConversation();
+  const { selectedConversation, unreadCounts, setUnreadCounts, pinnedChatIds } = useConversation();
 
   useEffect(() => {
     if (selectedConversation && unreadCounts[selectedConversation._id]) {
@@ -17,14 +16,30 @@ const Conversations = () => {
     }
   }, [selectedConversation, unreadCounts, setUnreadCounts]);
 
+  const sortedConversations = [...conversations].sort((a, b) => {
+    const aPinnedIndex = pinnedChatIds.indexOf(a._id);
+    const bPinnedIndex = pinnedChatIds.indexOf(b._id);
+
+    const aIsPinned = aPinnedIndex !== -1;
+    const bIsPinned = bPinnedIndex !== -1;
+
+    if (aIsPinned && bIsPinned) {
+      return aPinnedIndex - bPinnedIndex;
+    }
+    if (aIsPinned) return -1;
+    if (bIsPinned) return 1;
+
+    return 0;
+  });
+
   return (
     <div className="py-2 flex flex-col overflow-auto">
-      {conversations.map((conversation, idx) => (
+      {sortedConversations.map((conversation, idx) => (
         <Conversation
           key={conversation._id}
           conversation={conversation}
           emoji={getRandomEmoji()}
-          lastIdx={idx === conversations.length - 1}
+          lastIdx={idx === sortedConversations.length - 1}
         />
       ))}
 
