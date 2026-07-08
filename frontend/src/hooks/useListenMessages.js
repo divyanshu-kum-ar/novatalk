@@ -3,10 +3,21 @@ import { useEffect } from "react";
 import { useSocketContext } from "../context/SocketContext";
 import useConversation from "../zustand/useConversation";
 
+import { useAuthContext } from "../context/AuthContext";
+
 import notificationSound from "../assets/sounds/notification.mp3";
 
 const useListenMessages = () => {
   const { socket } = useSocketContext();
+  const { authUser } = useAuthContext();
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      if (Notification.permission === "default") {
+        Notification.requestPermission();
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (!socket) return;
@@ -27,6 +38,66 @@ const useListenMessages = () => {
       if (!isMuted) {
         const sound = new Audio(notificationSound);
         sound.play();
+      }
+
+      // Show desktop notification if appropriate
+      const isFromMe = authUser && authUser._id === senderId;
+      if (
+        !isFromMe &&
+        !isMuted &&
+        !isFromActive &&
+        !document.hasFocus() &&
+        typeof window !== "undefined" &&
+        "Notification" in window &&
+        Notification.permission === "granted"
+      ) {
+        const matchedConv = currentConvs.find((c) => c._id === conversationKey);
+        let senderName = "";
+        let senderAvatar = "";
+
+        if (typeof newMessage.senderId === "object" && newMessage.senderId !== null) {
+          senderName = newMessage.senderId.fullName;
+          senderAvatar = newMessage.senderId.profilePic;
+        } else if (matchedConv) {
+          if (matchedConv.isGroup) {
+            const participant = matchedConv.participants?.find((p) => (p._id || p) === senderId);
+            if (participant) {
+              senderName = `${participant.fullName} (${matchedConv.groupName})`;
+              senderAvatar = participant.profilePic;
+            } else {
+              senderName = matchedConv.groupName;
+              senderAvatar = matchedConv.groupAvatar;
+            }
+          } else {
+            senderName = matchedConv.fullName;
+            senderAvatar = matchedConv.profilePic;
+          }
+        } else {
+          senderName = "New Message";
+        }
+
+        let previewText = newMessage.message;
+        if (!previewText) {
+          if (newMessage.image) {
+            previewText = "📷 Image";
+          } else if (newMessage.file) {
+            previewText = `📁 ${newMessage.fileName || "File"}`;
+          } else {
+            previewText = "New message";
+          }
+        }
+
+        const notification = new Notification(senderName, {
+          body: previewText,
+          icon: senderAvatar || undefined,
+        });
+
+        notification.onclick = () => {
+          window.focus();
+          if (matchedConv) {
+            state.setSelectedConversation(matchedConv);
+          }
+        };
       }
 
       if (isFromActive) {
