@@ -128,19 +128,28 @@ const Message = ({ message }) => {
     }
   });
 
-  const handleDelete = async (messageId) => {
-    const confirmDelete = window.confirm("Are you sure you want to delete this message?");
+  const handleDelete = async (messageId, deleteType) => {
+    const confirmDelete = window.confirm(`Are you sure you want to delete this message ${deleteType === "me" ? "for you" : "for everyone"}?`);
     if (!confirmDelete) return;
 
     try {
-      const res = await fetch(`/api/messages/delete/${messageId}`, {
+      const res = await fetch(`/api/messages/delete/${messageId}?type=${deleteType}`, {
         method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ type: deleteType }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
 
-      setMessages(messages.filter((m) => m._id !== messageId));
-      toast.success("Message deleted successfully");
+      if (deleteType === "me") {
+        setMessages(messages.filter((m) => m._id !== messageId));
+        toast.success("Message deleted for you");
+      } else {
+        setMessages(messages.map((m) => (m._id === messageId ? data : m)));
+        toast.success("Message deleted for everyone");
+      }
     } catch (err) {
       toast.error(err.message);
     }
@@ -281,7 +290,7 @@ const Message = ({ message }) => {
             {typeof message.senderId === "object" && message.senderId !== null ? message.senderId.fullName : "User"}
           </span>
         )}
-        {showPicker && (
+        {showPicker && !message.isDeletedForEveryone && (
           <div
             className={`absolute bottom-[105%] ${fromMe ? "right-0" : "left-0"} mb-1 bg-gray-800 border border-gray-700 rounded-full py-1 px-2.5 flex gap-1.5 shadow-xl z-50 animate-fade-in`}
             onMouseEnter={() => setShowPicker(true)}
@@ -301,20 +310,23 @@ const Message = ({ message }) => {
             ))}
           </div>
         )}
-        <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity dropdown dropdown-left dropdown-end z-10">
-          <div tabIndex={0} role="button" className="text-gray-300 hover:text-white cursor-pointer p-0.5 rounded hover:bg-black hover:bg-opacity-25">
-            <BsThreeDotsVertical size={14} />
+        {!message.isDeletedForEveryone && (
+          <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity dropdown dropdown-left dropdown-end z-10">
+            <div tabIndex={0} role="button" className="text-gray-300 hover:text-white cursor-pointer p-0.5 rounded hover:bg-black hover:bg-opacity-25">
+              <BsThreeDotsVertical size={14} />
+            </div>
+            <ul tabIndex={0} className="dropdown-content z-20 menu p-1 shadow bg-gray-800 border border-gray-700 rounded-box w-36 text-[10px] text-white">
+              {fromMe && (
+                <>
+                  <li><button type="button" onClick={() => setEditingMessage(message)} className="hover:bg-gray-700">Edit</button></li>
+                  <li><button type="button" onClick={() => handleDelete(message._id, "me")} className="text-red-500 hover:text-red-400 hover:bg-gray-700">Delete for Me</button></li>
+                  <li><button type="button" onClick={() => handleDelete(message._id, "everyone")} className="text-red-500 hover:text-red-400 hover:bg-gray-700">Delete for Everyone</button></li>
+                </>
+              )}
+              <li><button type="button" onClick={() => setReplyingTo(message)} className="hover:bg-gray-700">Reply</button></li>
+            </ul>
           </div>
-          <ul tabIndex={0} className="dropdown-content z-20 menu p-1 shadow bg-gray-800 border border-gray-700 rounded-box w-20 text-[10px] text-white">
-            {fromMe && (
-              <>
-                <li><button type="button" onClick={() => setEditingMessage(message)} className="hover:bg-gray-700">Edit</button></li>
-                <li><button type="button" onClick={() => handleDelete(message._id)} className="text-red-500 hover:text-red-400 hover:bg-gray-700">Delete</button></li>
-              </>
-            )}
-            <li><button type="button" onClick={() => setReplyingTo(message)} className="hover:bg-gray-700">Reply</button></li>
-          </ul>
-        </div>
+        )}
         {message.replyTo && (
           <div 
             onClick={(e) => {
@@ -383,9 +395,9 @@ const Message = ({ message }) => {
           </div>
         )}
         {message.message && (
-          <span className="break-words">
+          <span className={`break-words ${message.isDeletedForEveryone ? "italic opacity-60 font-normal select-none" : ""}`}>
             {message.message}
-            {message.edited && <span className="text-[9px] opacity-60 ml-1.5 select-none font-normal">(edited)</span>}
+            {message.edited && !message.isDeletedForEveryone && <span className="text-[9px] opacity-60 ml-1.5 select-none font-normal">(edited)</span>}
           </span>
         )}
       </div>

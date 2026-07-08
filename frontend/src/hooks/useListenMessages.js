@@ -77,6 +77,13 @@ const useListenMessages = () => {
       state.setMessages(state.messages.filter((m) => m._id !== messageId));
     };
 
+    const handleMessageDeletedForEveryone = (updatedMessage) => {
+      const state = useConversation.getState();
+      state.setMessages(
+        state.messages.map((m) => (m._id === updatedMessage._id ? updatedMessage : m))
+      );
+    };
+
     const handleReactionUpdate = ({ messageId, reactions }) => {
       const state = useConversation.getState();
       state.setMessages(state.messages.map((m) => (m._id === messageId ? { ...m, reactions } : m)));
@@ -96,6 +103,7 @@ const useListenMessages = () => {
     socket?.on("conversationRead", handleConversationRead);
     socket?.on("messageEdited", handleMessageEdited);
     socket?.on("messageDeleted", handleMessageDeleted);
+    socket?.on("messageDeletedForEveryone", handleMessageDeletedForEveryone);
     socket?.on("messageReactionUpdate", handleReactionUpdate);
     socket?.on("userOffline", handleUserOffline);
 
@@ -106,6 +114,7 @@ const useListenMessages = () => {
       socket?.off("conversationRead", handleConversationRead);
       socket?.off("messageEdited", handleMessageEdited);
       socket?.off("messageDeleted", handleMessageDeleted);
+      socket?.off("messageDeletedForEveryone", handleMessageDeletedForEveryone);
       socket?.off("messageReactionUpdate", handleReactionUpdate);
       socket?.off("userOffline", handleUserOffline);
     };

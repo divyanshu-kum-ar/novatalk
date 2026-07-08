@@ -71,6 +71,16 @@ const messageSchema = new mongoose.Schema(
         default: "voice",
       },
     },
+    deletedFor: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    isDeletedForEveryone: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

@@ -123,6 +123,7 @@ export const getMessages = async (req, res) => {
       isGroup: true,
     }).populate({
       path: "messages",
+      match: { deletedFor: { $ne: senderId } },
       populate: [
         {
           path: "senderId",
@@ -150,6 +151,7 @@ export const getMessages = async (req, res) => {
         isGroup: { $ne: true },
       }).populate({
         path: "messages",
+        match: { deletedFor: { $ne: senderId } },
         populate: [
           {
             path: "senderId",
@@ -250,6 +252,8 @@ export const editMessage = async (req, res) => {
 export const deleteMessage = async (req, res) => {
   try {
     const { id: messageId } = req.params;
+    const { type } = req.body;
+    const deleteType = type || req.query.type || "everyone";
     const senderId = req.user._id;
 
     const msg = await Message.findById(messageId);
@@ -262,33 +266,63 @@ export const deleteMessage = async (req, res) => {
     }
 
     const conversation = await Conversation.findOne({ messages: messageId });
-    if (conversation) {
-      conversation.messages.pull(messageId);
-      await conversation.save();
-    }
 
-    // Delete message
-    await Message.findByIdAndDelete(messageId);
-
-    if (conversation && conversation.isGroup) {
-      conversation.participants.forEach((pId) => {
-        const socketId = getReceiverSocketId(pId);
-        if (socketId) {
-          io.to(socketId).emit("messageDeleted", { messageId });
-        }
-      });
+    if (deleteType === "me") {
+      if (!msg.deletedFor.includes(senderId)) {
+        msg.deletedFor.push(senderId);
+        await msg.save();
+      }
+      return res.status(200).json({ message: "Message deleted for me successfully", deleteType: "me" });
     } else {
-      const receiverSocketId = getReceiverSocketId(msg.receiverId);
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit("messageDeleted", { messageId });
-      }
-      const senderSocketId = getReceiverSocketId(senderId);
-      if (senderSocketId && senderSocketId !== receiverSocketId) {
-        io.to(senderSocketId).emit("messageDeleted", { messageId });
-      }
-    }
+      msg.message = "This message was deleted.";
+      msg.image = null;
+      msg.file = null;
+      msg.fileName = null;
+      msg.fileSize = null;
+      msg.isDeletedForEveryone = true;
+      msg.reactions = [];
+      await msg.save();
 
-    res.status(200).json({ message: "Message deleted successfully" });
+      await msg.populate({
+        path: "senderId",
+        select: "username fullName profilePic gender"
+      });
+
+      if (msg.replyTo) {
+        await msg.populate({
+          path: "replyTo",
+          select: "message image file fileName fileSize senderId",
+          populate: {
+            path: "senderId",
+            select: "username fullName"
+          }
+        });
+      }
+
+      const messageResponse = msg.toObject();
+
+      if (conversation) {
+        if (conversation.isGroup) {
+          conversation.participants.forEach((pId) => {
+            const socketId = getReceiverSocketId(pId);
+            if (socketId) {
+              io.to(socketId).emit("messageDeletedForEveryone", messageResponse);
+            }
+          });
+        } else {
+          const receiverSocketId = getReceiverSocketId(msg.receiverId);
+          if (receiverSocketId) {
+            io.to(receiverSocketId).emit("messageDeletedForEveryone", messageResponse);
+          }
+          const senderSocketId = getReceiverSocketId(senderId);
+          if (senderSocketId && senderSocketId !== receiverSocketId) {
+            io.to(senderSocketId).emit("messageDeletedForEveryone", messageResponse);
+          }
+        }
+      }
+
+      return res.status(200).json(messageResponse);
+    }
   } catch (error) {
     console.log("Error in deleteMessage controller:", error);
     res.status(500).json({ error: "Internal Server Error" });
