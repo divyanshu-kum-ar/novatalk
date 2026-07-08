@@ -13,7 +13,7 @@ const getDefaultAvatar = (gender) => {
 };
 
 const Conversation = ({ conversation, lastIdx, emoji }) => {
-  const { selectedConversation, setSelectedConversation, unreadCounts, pinnedChatIds, setPinnedChatIds } = useConversation();
+  const { selectedConversation, setSelectedConversation, unreadCounts, pinnedChatIds, setPinnedChatIds, mutedChatIds, setMutedChatIds } = useConversation();
 
   const isSelected = selectedConversation?._id === conversation._id;
 
@@ -21,6 +21,7 @@ const Conversation = ({ conversation, lastIdx, emoji }) => {
   const isGroup = conversation.isGroup;
   const isOnline = isGroup ? false : onlineUsers.includes(conversation._id);
   const isPinned = pinnedChatIds.includes(conversation._id);
+  const isMuted = (mutedChatIds || []).includes(conversation._id);
 
   const handleTogglePin = async (e) => {
     e.stopPropagation();
@@ -31,6 +32,20 @@ const Conversation = ({ conversation, lastIdx, emoji }) => {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setPinnedChatIds(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleToggleMute = async (e) => {
+    e.stopPropagation();
+    try {
+      const res = await fetch(`/api/users/mute/${conversation._id}`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setMutedChatIds(data);
     } catch (err) {
       console.error(err);
     }
@@ -69,6 +84,7 @@ const Conversation = ({ conversation, lastIdx, emoji }) => {
             <p className="font-bold text-gray-200">{isGroup ? conversation.groupName : conversation.fullName}</p>
             <div className="flex items-center gap-2">
               {isPinned && <BsPinAngleFill className="text-yellow-400 rotate-[45deg]" size={14} title="Pinned Chat" />}
+              {isMuted && <span className="text-[12px]" title="Muted Chat">🔕</span>}
               {unreadCount > 0 && (
                 <span className="badge badge-error badge-sm text-white font-semibold rounded-full px-1.5 min-w-[20px] h-[20px] text-center">
                   {unreadCount}
@@ -82,6 +98,11 @@ const Conversation = ({ conversation, lastIdx, emoji }) => {
                   <li>
                     <button type="button" onClick={handleTogglePin} className="hover:bg-gray-700">
                       {isPinned ? "Unpin Chat" : "Pin Chat"}
+                    </button>
+                  </li>
+                  <li>
+                    <button type="button" onClick={handleToggleMute} className="hover:bg-gray-700">
+                      {isMuted ? "Unmute Chat" : "Mute Chat"}
                     </button>
                   </li>
                 </ul>

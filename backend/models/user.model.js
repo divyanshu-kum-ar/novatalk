@@ -36,6 +36,13 @@ const userSchema = new mongoose.Schema(
         default: [],
       }
     ],
+    mutedConversations: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Conversation",
+        default: [],
+      }
+    ],
   },
   { timestamps: true }
 );

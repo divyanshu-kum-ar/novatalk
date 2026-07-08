@@ -4,7 +4,7 @@ import useConversation from "../zustand/useConversation";
 
 const useGetConversations = () => {
   const [loading, setLoading] = useState(false);
-  const { conversations, setConversations, setPinnedChatIds } = useConversation();
+  const { conversations, setConversations, setPinnedChatIds, setMutedChatIds } = useConversation();
 
   useEffect(() => {
     const getConversations = async () => {
@@ -17,6 +17,7 @@ const useGetConversations = () => {
         }
         setConversations(data.conversations || data);
         setPinnedChatIds(data.pinnedChatIds || []);
+        setMutedChatIds(data.mutedChatIds || []);
       } catch (error) {
         toast.error(error.message);
       } finally {

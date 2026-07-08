@@ -18,6 +18,8 @@ const useConversation = create((set) => ({
   setSearchQuery: (searchQuery) => set({ searchQuery }),
   pinnedChatIds: [],
   setPinnedChatIds: (pinnedChatIds) => set({ pinnedChatIds }),
+  mutedChatIds: [],
+  setMutedChatIds: (mutedChatIds) => set({ mutedChatIds }),
 }));
 
 export default useConversation;

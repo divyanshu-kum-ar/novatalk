@@ -16,13 +16,44 @@ export const getUsers = async (req, res) => {
 
     const userObj = await User.findById(loggedInUser);
     const pinnedChatIds = userObj ? (userObj.pinnedConversations || []) : [];
+    const mutedChatIds = userObj ? (userObj.mutedConversations || []) : [];
 
     res.status(200).json({
       conversations: [...groups, ...allUsers],
       pinnedChatIds,
+      mutedChatIds,
     });
   } catch (error) {
     console.log("Error in getUsers controller:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+export const toggleMuteChat = async (req, res) => {
+  try {
+    const { id: chatId } = req.params;
+    const userId = req.user._id;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (!user.mutedConversations) {
+      user.mutedConversations = [];
+    }
+
+    const index = user.mutedConversations.indexOf(chatId);
+    if (index === -1) {
+      user.mutedConversations.push(chatId);
+    } else {
+      user.mutedConversations.splice(index, 1);
+    }
+
+    await user.save();
+    res.status(200).json(user.mutedConversations);
+  } catch (error) {
+    console.log("Error in toggleMuteChat controller:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 };

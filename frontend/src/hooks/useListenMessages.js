@@ -22,9 +22,12 @@ const useListenMessages = () => {
       const conversationKey = newMessage.conversationId || senderId;
       const isFromActive = activeConv && activeConv._id === conversationKey;
 
-      // Play notification sound
-      const sound = new Audio(notificationSound);
-      sound.play();
+      // Play notification sound if chat is not muted
+      const isMuted = state.mutedChatIds && state.mutedChatIds.includes(conversationKey);
+      if (!isMuted) {
+        const sound = new Audio(notificationSound);
+        sound.play();
+      }
 
       if (isFromActive) {
         newMessage.shouldShake = true;
