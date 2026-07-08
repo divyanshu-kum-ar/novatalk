@@ -13,7 +13,7 @@ const getDefaultAvatar = (gender) => {
 };
 
 const Conversation = ({ conversation, lastIdx, emoji }) => {
-  const { selectedConversation, setSelectedConversation, unreadCounts, pinnedChatIds, setPinnedChatIds, mutedChatIds, setMutedChatIds } = useConversation();
+  const { selectedConversation, setSelectedConversation, unreadCounts, pinnedChatIds, setPinnedChatIds, mutedChatIds, setMutedChatIds, archivedChatIds, setArchivedChatIds } = useConversation();
 
   const isSelected = selectedConversation?._id === conversation._id;
 
@@ -22,6 +22,7 @@ const Conversation = ({ conversation, lastIdx, emoji }) => {
   const isOnline = isGroup ? false : onlineUsers.includes(conversation._id);
   const isPinned = pinnedChatIds.includes(conversation._id);
   const isMuted = (mutedChatIds || []).includes(conversation._id);
+  const isArchived = (archivedChatIds || []).includes(conversation._id);
 
   const handleTogglePin = async (e) => {
     e.stopPropagation();
@@ -46,6 +47,20 @@ const Conversation = ({ conversation, lastIdx, emoji }) => {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setMutedChatIds(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleToggleArchive = async (e) => {
+    e.stopPropagation();
+    try {
+      const res = await fetch(`/api/users/archive/${conversation._id}`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setArchivedChatIds(data);
     } catch (err) {
       console.error(err);
     }
@@ -103,6 +118,11 @@ const Conversation = ({ conversation, lastIdx, emoji }) => {
                   <li>
                     <button type="button" onClick={handleToggleMute} className="hover:bg-gray-700">
                       {isMuted ? "Unmute Chat" : "Mute Chat"}
+                    </button>
+                  </li>
+                  <li>
+                    <button type="button" onClick={handleToggleArchive} className="hover:bg-gray-700">
+                      {isArchived ? "Unarchive Chat" : "Archive Chat"}
                     </button>
                   </li>
                 </ul>

@@ -17,11 +17,13 @@ export const getUsers = async (req, res) => {
     const userObj = await User.findById(loggedInUser);
     const pinnedChatIds = userObj ? (userObj.pinnedConversations || []) : [];
     const mutedChatIds = userObj ? (userObj.mutedConversations || []) : [];
+    const archivedChatIds = userObj ? (userObj.archivedConversations || []) : [];
 
     res.status(200).json({
       conversations: [...groups, ...allUsers],
       pinnedChatIds,
       mutedChatIds,
+      archivedChatIds,
     });
   } catch (error) {
     console.log("Error in getUsers controller:", error);
@@ -54,6 +56,35 @@ export const toggleMuteChat = async (req, res) => {
     res.status(200).json(user.mutedConversations);
   } catch (error) {
     console.log("Error in toggleMuteChat controller:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+export const toggleArchiveChat = async (req, res) => {
+  try {
+    const { id: chatId } = req.params;
+    const userId = req.user._id;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (!user.archivedConversations) {
+      user.archivedConversations = [];
+    }
+
+    const index = user.archivedConversations.indexOf(chatId);
+    if (index === -1) {
+      user.archivedConversations.push(chatId);
+    } else {
+      user.archivedConversations.splice(index, 1);
+    }
+
+    await user.save();
+    res.status(200).json(user.archivedConversations);
+  } catch (error) {
+    console.log("Error in toggleArchiveChat controller:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 };

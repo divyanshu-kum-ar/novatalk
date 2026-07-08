@@ -20,6 +20,10 @@ const useConversation = create((set) => ({
   setPinnedChatIds: (pinnedChatIds) => set({ pinnedChatIds }),
   mutedChatIds: [],
   setMutedChatIds: (mutedChatIds) => set({ mutedChatIds }),
+  archivedChatIds: [],
+  setArchivedChatIds: (archivedChatIds) => set({ archivedChatIds }),
+  viewArchived: false,
+  setViewArchived: (viewArchived) => set({ viewArchived }),
 }));
 
 export default useConversation;

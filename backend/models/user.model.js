@@ -43,6 +43,13 @@ const userSchema = new mongoose.Schema(
         default: [],
       }
     ],
+    archivedConversations: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Conversation",
+        default: [],
+      }
+    ],
   },
   { timestamps: true }
 );

@@ -6,7 +6,7 @@ import useConversation from "../../zustand/useConversation";
 
 const Conversations = () => {
   const { loading, conversations } = useGetConversations();
-  const { selectedConversation, unreadCounts, setUnreadCounts, pinnedChatIds } = useConversation();
+  const { selectedConversation, unreadCounts, setUnreadCounts, pinnedChatIds, archivedChatIds, viewArchived } = useConversation();
 
   useEffect(() => {
     if (selectedConversation && unreadCounts[selectedConversation._id]) {
@@ -16,7 +16,12 @@ const Conversations = () => {
     }
   }, [selectedConversation, unreadCounts, setUnreadCounts]);
 
-  const sortedConversations = [...conversations].sort((a, b) => {
+  const displayedConversations = conversations.filter((conversation) => {
+    const isArchived = (archivedChatIds || []).includes(conversation._id);
+    return viewArchived ? isArchived : !isArchived;
+  });
+
+  const sortedConversations = [...displayedConversations].sort((a, b) => {
     const aPinnedIndex = pinnedChatIds.indexOf(a._id);
     const bPinnedIndex = pinnedChatIds.indexOf(b._id);
 
