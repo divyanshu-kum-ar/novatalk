@@ -19,7 +19,7 @@ const Conversation = ({ conversation, lastIdx, emoji }) => {
 
   const { onlineUsers } = useSocketContext();
   const isGroup = conversation.isGroup;
-  const isOnline = isGroup ? false : onlineUsers.includes(conversation._id);
+  const isOnline = isGroup ? false : (conversation.hideOnline ? false : onlineUsers.includes(conversation._id));
   const isPinned = pinnedChatIds.includes(conversation._id);
   const isMuted = (mutedChatIds || []).includes(conversation._id);
   const isArchived = (archivedChatIds || []).includes(conversation._id);

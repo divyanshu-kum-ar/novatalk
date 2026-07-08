@@ -1,6 +1,8 @@
 import Message from "../models/message.model.js";
 import Conversation from "./../models/conversation.model.js";
+import User from "../models/user.model.js";
 import { getReceiverSocketId, io } from "../socket/socket.js";
+import { sanitizeUserProfile } from "./user.controller.js";
 
 export const sendMessage = async (req, res) => {
   try {
@@ -127,7 +129,7 @@ export const getMessages = async (req, res) => {
       populate: [
         {
           path: "senderId",
-          select: "username fullName profilePic gender"
+          select: "username fullName profilePic gender about privacySettings"
         },
         {
           path: "replyTo",
@@ -155,7 +157,7 @@ export const getMessages = async (req, res) => {
         populate: [
           {
             path: "senderId",
-            select: "username fullName profilePic gender"
+            select: "username fullName profilePic gender about privacySettings"
           },
           {
             path: "replyTo",
@@ -179,19 +181,33 @@ export const getMessages = async (req, res) => {
 
     // Update status and emit events for 1-to-1 chats only
     if (!conversation.isGroup) {
-      await Message.updateMany(
-        { senderId: userToChatId, receiverId: senderId, status: { $ne: "read" } },
-        { $set: { status: "read" } }
-      );
+      const otherUser = await User.findById(userToChatId);
+      const currentUser = await User.findById(senderId);
+      const otherReadReceipts = otherUser?.privacySettings?.readReceipts !== false;
+      const currentReadReceipts = currentUser?.privacySettings?.readReceipts !== false;
 
-      const senderSocketId = getReceiverSocketId(userToChatId);
-      if (senderSocketId) {
-        io.to(senderSocketId).emit("conversationRead", { readerId: senderId });
+      if (otherReadReceipts && currentReadReceipts) {
+        await Message.updateMany(
+          { senderId: userToChatId, receiverId: senderId, status: { $ne: "read" } },
+          { $set: { status: "read" } }
+        );
+
+        const senderSocketId = getReceiverSocketId(userToChatId);
+        if (senderSocketId) {
+          io.to(senderSocketId).emit("conversationRead", { readerId: senderId });
+        }
       }
     }
 
     const messages = conversation.messages;
-    res.status(200).json(messages);
+    const sanitizedMessages = await Promise.all(messages.map(async (m) => {
+      const mObj = m.toObject();
+      if (mObj.senderId) {
+        mObj.senderId = await sanitizeUserProfile(mObj.senderId, senderId);
+      }
+      return mObj;
+    }));
+    res.status(200).json(sanitizedMessages);
   } catch (error) {
     console.log("Error in getMessages controller:", error);
     res.status(500).json({ error: "Internal Server Error" });

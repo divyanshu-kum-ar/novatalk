@@ -155,10 +155,21 @@ io.on("connection", (socket) => {
 
   socket.on("messageRead", async ({ messageId, senderId }) => {
     try {
-      await Message.findByIdAndUpdate(messageId, { status: "read" });
-      const senderSocketId = getReceiverSocketId(senderId);
-      if (senderSocketId) {
-        io.to(senderSocketId).emit("messageStatusUpdate", { messageId, status: "read" });
+      const msg = await Message.findById(messageId);
+      if (msg) {
+        const receiver = await User.findById(userId);
+        const sender = await User.findById(senderId);
+        const otherReadReceipts = sender?.privacySettings?.readReceipts !== false;
+        const currentReadReceipts = receiver?.privacySettings?.readReceipts !== false;
+
+        if (otherReadReceipts && currentReadReceipts) {
+          msg.status = "read";
+          await msg.save();
+          const senderSocketId = getReceiverSocketId(senderId);
+          if (senderSocketId) {
+            io.to(senderSocketId).emit("messageStatusUpdate", { messageId, status: "read" });
+          }
+        }
       }
     } catch (e) {
       console.log(e);

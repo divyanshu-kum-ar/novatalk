@@ -34,7 +34,32 @@ const MessageContainer = () => {
 
   useEffect(() => {
     closeSearch();
-  }, [selectedConversation]);
+
+    const fetchLatestBio = async () => {
+      if (selectedConversation && !selectedConversation.isGroup) {
+        try {
+          const res = await fetch(`/api/users/${selectedConversation._id}`);
+          const data = await res.json();
+          if (!data.error) {
+            setSelectedConversation({
+              ...selectedConversation,
+              about: data.about || "",
+            });
+            const state = useConversation.getState();
+            state.setConversations(
+              state.conversations.map((c) =>
+                c._id === selectedConversation._id ? { ...c, about: data.about || "" } : c
+              )
+            );
+          }
+        } catch (err) {
+          console.error("Error fetching user profile:", err);
+        }
+      }
+    };
+
+    fetchLatestBio();
+  }, [selectedConversation?._id]);
 
   const handleSearchChange = (e) => {
     const val = e.target.value;
@@ -95,7 +120,7 @@ const MessageContainer = () => {
   };
 
   const isGroup = selectedConversation?.isGroup;
-  const isOnline = !isGroup && selectedConversation && onlineUsers.includes(selectedConversation._id);
+  const isOnline = !isGroup && selectedConversation && !selectedConversation.hideOnline && onlineUsers.includes(selectedConversation._id);
 
   const isCreator = isGroup && (
     selectedConversation.groupCreator === authUser._id ||
@@ -215,6 +240,11 @@ const MessageContainer = () => {
                   )}
                 </span>
               </div>
+              {!isGroup && selectedConversation.about && (
+                <span className="text-[10px] text-gray-300 italic font-medium mt-0.5 max-w-[300px] truncate animate-fadeIn" title={selectedConversation.about}>
+                  {selectedConversation.about}
+                </span>
+              )}
               <span className="text-[10px] text-gray-200 flex items-center gap-1 font-medium mt-0.5">
                 {isGroup ? (
                   <span>{selectedConversation.participants?.length || 0} members</span>

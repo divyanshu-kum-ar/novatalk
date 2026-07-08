@@ -50,6 +50,37 @@ const userSchema = new mongoose.Schema(
         default: [],
       }
     ],
+    about: {
+      type: String,
+      default: "",
+      maxLength: 150,
+    },
+    privacySettings: {
+      lastSeen: {
+        type: String,
+        enum: ["everyone", "contacts", "nobody"],
+        default: "everyone",
+      },
+      onlineStatus: {
+        type: String,
+        enum: ["everyone", "contacts", "nobody"],
+        default: "everyone",
+      },
+      profilePhoto: {
+        type: String,
+        enum: ["everyone", "contacts", "nobody"],
+        default: "everyone",
+      },
+      about: {
+        type: String,
+        enum: ["everyone", "contacts", "nobody"],
+        default: "everyone",
+      },
+      readReceipts: {
+        type: Boolean,
+        default: true,
+      },
+    },
   },
   { timestamps: true }
 );
