@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { BiUser, BiArchiveIn } from "react-icons/bi";
+import { BiUser, BiArchiveIn, BiCog } from "react-icons/bi";
 import Conversations from "./Conversations";
 import LogoutButton from "./LogoutButton";
 import SearchInput from "./SearchInput";
@@ -54,9 +54,11 @@ const Sidebar = () => {
             <BiArchiveIn className="w-6 h-6 cursor-pointer" />
           </button>
         </div>
-        <Link to="/profile" title="Profile Settings">
-          <BiUser className="w-6 h-6 text-white cursor-pointer hover:text-sky-500 transition-colors" />
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link to="/settings" title="App Settings">
+            <BiCog className="w-6 h-6 text-white cursor-pointer hover:text-sky-500 transition-colors" />
+          </Link>
+        </div>
       </div>
       <CreateGroupModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} />
     </div>

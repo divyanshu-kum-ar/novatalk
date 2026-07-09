@@ -1,5 +1,6 @@
 import User from "../models/user.model.js";
 import Conversation from "../models/conversation.model.js";
+import Message from "../models/message.model.js";
 import bcrypt from "bcryptjs";
 
 export const sanitizeUserProfile = async (targetUser, requestingUserId) => {
@@ -290,6 +291,42 @@ export const getUserProfile = async (req, res) => {
     res.status(200).json(sanitized);
   } catch (error) {
     console.log("Error in getUserProfile controller:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+export const deleteProfile = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // 1. Delete all messages sent by this user
+    await Message.deleteMany({ senderId: userId });
+
+    // 2. Remove user from all conversations participants lists
+    await Conversation.updateMany(
+      { participants: userId },
+      { $pull: { participants: userId } }
+    );
+
+    // 3. Clean up conversations with no participants left, or 1-on-1 chats that are now orphaned
+    await Conversation.deleteMany({
+      $or: [
+        { participants: { $size: 0 } },
+        { isGroup: false, participants: { $size: 1 } }
+      ]
+    });
+
+    // 4. Delete the User record
+    await User.findByIdAndDelete(userId);
+
+    res.status(200).json({ message: "Account deleted successfully" });
+  } catch (error) {
+    console.log("Error in deleteProfile controller:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
