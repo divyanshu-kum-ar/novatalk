@@ -8,11 +8,13 @@ import useConversation from "./../../zustand/useConversation";
 import { useEffect } from "react";
 import { useAuthContext } from "../../context/AuthContext";
 import ManageGroupModal from "./ManageGroupModal";
+import ForwardModal from "./ForwardModal";
 import { useCallContext } from "../../context/CallContext";
+import EmptyState from "../EmptyState";
 
 const MessageContainer = () => {
   const { authUser } = useAuthContext();
-  const { selectedConversation, setSelectedConversation, messages, searchQuery, setSearchQuery } = useConversation();
+  const { selectedConversation, setSelectedConversation, messages, searchQuery, setSearchQuery, forwardingMessage, setForwardingMessage } = useConversation();
   const { socket, onlineUsers } = useSocketContext();
   const { startCall } = useCallContext();
   const [isTyping, setIsTyping] = useState(false);
@@ -131,7 +133,7 @@ const MessageContainer = () => {
     if (!dateString) return "Offline";
     const date = new Date(dateString);
     const now = new Date();
-    
+
     const diffMs = now - date;
     const diffSec = Math.floor(diffMs / 1000);
     const diffMin = Math.floor(diffSec / 60);
@@ -142,33 +144,33 @@ const MessageContainer = () => {
     hours = hours % 12;
     hours = hours ? hours : 12;
     const timeStr = `${hours}:${minutes} ${ampm}`;
-    
+
     if (diffMs < 0 || diffSec < 60) {
       return "Last seen just now";
     }
     if (diffMin < 60) {
       return `Last seen ${diffMin} ${diffMin === 1 ? 'minute' : 'minutes'} ago`;
     }
-    
+
     // Check if today
     const isToday = date.getDate() === now.getDate() &&
-                    date.getMonth() === now.getMonth() &&
-                    date.getFullYear() === now.getFullYear();
-                    
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear();
+
     // Check if yesterday
     const yesterday = new Date(now);
     yesterday.setDate(now.getDate() - 1);
     const isYesterday = date.getDate() === yesterday.getDate() &&
-                        date.getMonth() === yesterday.getMonth() &&
-                        date.getFullYear() === yesterday.getFullYear();
-                        
+      date.getMonth() === yesterday.getMonth() &&
+      date.getFullYear() === yesterday.getFullYear();
+
     if (isToday) {
       return `Last seen today at ${timeStr}`;
     }
     if (isYesterday) {
       return `Last seen yesterday at ${timeStr}`;
     }
-    
+
     // Older than yesterday (e.g. 05 Jul 2026, 7:30 PM)
     const day = String(date.getDate()).padStart(2, '0');
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -217,7 +219,7 @@ const MessageContainer = () => {
   }, [socket, selectedConversation]);
 
   return (
-    <div className="md:min-w-[450px] flex flex-col">
+    <div className="md:min-w-[450px] flex flex-col h-full w-full">
       {!selectedConversation ? (
         <NoChatSelected />
       ) : (
@@ -343,8 +345,12 @@ const MessageContainer = () => {
           )}
 
           {showSearchBar && matchingIds.length === 0 && searchVal.trim() && (
-            <div className="bg-slate-800 text-center py-2 text-xs text-gray-400 border-b border-gray-700 animate-fade-in">
-              No results found
+            <div className="py-4 bg-slate-850">
+              <EmptyState
+                type="search"
+                title="No results found"
+                subtitle="Try another keyword."
+              />
             </div>
           )}
 
@@ -358,6 +364,12 @@ const MessageContainer = () => {
               group={selectedConversation}
             />
           )}
+
+          <ForwardModal
+            isOpen={!!forwardingMessage}
+            onClose={() => setForwardingMessage(null)}
+            messageToForward={forwardingMessage}
+          />
         </>
       )}
     </div>
@@ -368,11 +380,13 @@ export default MessageContainer;
 const NoChatSelected = () => {
   const { authUser } = useAuthContext();
   return (
-    <div className="flex items-center justify-center w-full h-full">
-      <div className="px-4 text-center sm:text-lg md:text-xl text-gray-200 font-semibold flex flex-col items-center gap-2">
-        <p>Welcome 👋 {authUser.fullName} ❄</p>
-        <p>Select a chat to start messaging</p>
-        <TiMessages className="text-3xl md:text-6xl text-center" />
+    <div className="flex items-center justify-center w-full h-full p-4">
+      <div className="animate-fadeIn">
+        <EmptyState
+          type="chats"
+          title={`Welcome 👋 ${authUser.fullName}`}
+          subtitle="Select a chat from the sidebar to start messaging and sharing files."
+        />
       </div>
     </div>
   );

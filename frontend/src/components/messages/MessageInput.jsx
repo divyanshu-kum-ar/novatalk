@@ -60,6 +60,7 @@ const MessageInput = () => {
   const { socket } = useSocketContext();
   const { authUser } = useAuthContext();
   const [typingTimeout, setTypingTimeout] = useState(null);
+  const uploadIntervalRef = useRef(null);
 
   const getReplyingSnippet = (msg) => {
     if (!msg) return "";
@@ -158,6 +159,10 @@ const MessageInput = () => {
   };
 
   const clearImage = () => {
+    if (uploadIntervalRef.current) {
+      clearInterval(uploadIntervalRef.current);
+      uploadIntervalRef.current = null;
+    }
     setSelectedImage(null);
     setUploadProgress(0);
     setIsUploading(false);
@@ -167,6 +172,10 @@ const MessageInput = () => {
   };
 
   const clearFile = () => {
+    if (uploadIntervalRef.current) {
+      clearInterval(uploadIntervalRef.current);
+      uploadIntervalRef.current = null;
+    }
     setSelectedFile(null);
     setUploadProgress(0);
     setIsUploading(false);
@@ -209,10 +218,10 @@ const MessageInput = () => {
     } else if (selectedImage) {
       setIsUploading(true);
       setUploadProgress(10);
-      const interval = setInterval(() => {
+      uploadIntervalRef.current = setInterval(() => {
         setUploadProgress((prev) => {
           if (prev >= 90) {
-            clearInterval(interval);
+            clearInterval(uploadIntervalRef.current);
             return 90;
           }
           return prev + 15;
@@ -221,7 +230,7 @@ const MessageInput = () => {
 
       await sendMessage(message, selectedImage, null, replyingTo?._id);
       
-      clearInterval(interval);
+      if (uploadIntervalRef.current) clearInterval(uploadIntervalRef.current);
       setUploadProgress(100);
       setTimeout(() => {
         clearImage();
@@ -232,10 +241,10 @@ const MessageInput = () => {
     } else if (selectedFile) {
       setIsUploading(true);
       setUploadProgress(10);
-      const interval = setInterval(() => {
+      uploadIntervalRef.current = setInterval(() => {
         setUploadProgress((prev) => {
           if (prev >= 90) {
-            clearInterval(interval);
+            clearInterval(uploadIntervalRef.current);
             return 90;
           }
           return prev + 15;
@@ -244,7 +253,7 @@ const MessageInput = () => {
 
       await sendMessage(message, null, selectedFile, replyingTo?._id);
       
-      clearInterval(interval);
+      if (uploadIntervalRef.current) clearInterval(uploadIntervalRef.current);
       setUploadProgress(100);
       setTimeout(() => {
         clearFile();
@@ -358,19 +367,29 @@ const MessageInput = () => {
           <button
             type="button"
             onClick={clearImage}
-            className="absolute -top-1.5 -right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shadow transition-colors"
+            className="absolute -top-1.5 -right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shadow transition-colors z-20"
           >
             &times;
           </button>
           {isUploading && (
-            <div className="absolute inset-0 bg-black bg-opacity-75 rounded-lg flex flex-col items-center justify-center p-1">
-              <div className="w-4/5 bg-gray-700 rounded-full h-1.5 mb-1 overflow-hidden">
+            <div className="absolute inset-0 bg-black bg-opacity-80 rounded-lg flex flex-col items-center justify-center p-2 space-y-1.5 z-10">
+              <span className="text-[9px] text-gray-300 font-bold uppercase tracking-wider animate-pulse">Uploading Image...</span>
+              <div className="w-full bg-gray-700 rounded-full h-1.5 overflow-hidden">
                 <div
-                  className="bg-blue-500 h-1.5 rounded-full transition-all duration-200"
+                  className="bg-sky-500 h-full rounded-full transition-all duration-200"
                   style={{ width: `${uploadProgress}%` }}
                 ></div>
               </div>
-              <span className="text-[10px] text-white font-medium">{uploadProgress}%</span>
+              <div className="flex justify-between items-center w-full text-[9px] text-gray-400">
+                <span>{uploadProgress}%</span>
+                <button
+                  type="button"
+                  onClick={clearImage}
+                  className="text-red-400 hover:text-red-300 font-bold underline transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -388,19 +407,29 @@ const MessageInput = () => {
           <button
             type="button"
             onClick={clearFile}
-            className="bg-red-500 hover:bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shadow transition-colors ml-2 flex-shrink-0"
+            className="bg-red-500 hover:bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shadow transition-colors ml-2 flex-shrink-0 z-20"
           >
             &times;
           </button>
           {isUploading && (
-            <div className="absolute inset-0 bg-black bg-opacity-75 rounded-lg flex flex-col items-center justify-center p-1">
-              <div className="w-4/5 bg-gray-700 rounded-full h-1.5 mb-1 overflow-hidden">
+            <div className="absolute inset-0 bg-black bg-opacity-80 rounded-lg flex flex-col items-center justify-center p-2 space-y-1.5 z-10">
+              <span className="text-[9px] text-gray-300 font-bold uppercase tracking-wider animate-pulse">Uploading File...</span>
+              <div className="w-full bg-gray-700 rounded-full h-1.5 overflow-hidden">
                 <div
-                  className="bg-blue-500 h-1.5 rounded-full transition-all duration-200"
+                  className="bg-sky-500 h-full rounded-full transition-all duration-200"
                   style={{ width: `${uploadProgress}%` }}
                 ></div>
               </div>
-              <span className="text-[10px] text-white font-medium">{uploadProgress}%</span>
+              <div className="flex justify-between items-center w-full text-[9px] text-gray-400">
+                <span>{uploadProgress}%</span>
+                <button
+                  type="button"
+                  onClick={clearFile}
+                  className="text-red-400 hover:text-red-300 font-bold underline transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           )}
         </div>

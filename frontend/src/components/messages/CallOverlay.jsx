@@ -78,8 +78,8 @@ const CallOverlay = () => {
   if (outgoingCall) {
     const isVideo = outgoingCall.isVideo;
     return (
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-gradient-to-tr from-gray-950 via-gray-900 to-gray-950 backdrop-blur-xl p-6">
-        <div className="w-full max-w-sm flex flex-col items-center gap-9 select-none animate-fade-in">
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-gradient-to-tr from-gray-950 via-gray-900 to-gray-950 backdrop-blur-xl p-6 animate-fadeIn">
+        <div className="w-full max-w-sm flex flex-col items-center gap-9 select-none">
           <span className="text-blue-400 font-bold tracking-widest text-xs uppercase animate-pulse">
             Calling ({isVideo ? "Video" : "Voice"})...
           </span>
@@ -96,16 +96,20 @@ const CallOverlay = () => {
             </div>
           </div>
 
-          <div className="text-center">
+          <div className="text-center space-y-2">
+            <p className="text-xs text-gray-400 uppercase tracking-widest font-semibold">Calling {outgoingCall.receiverName}...</p>
             <h4 className="text-3xl font-extrabold text-white tracking-wide">{outgoingCall.receiverName}</h4>
-            <p className="text-sm text-gray-400 mt-2 font-medium">Connecting...</p>
+            <div className="flex items-center justify-center gap-2 mt-3 text-sky-400">
+              <div className="w-4 h-4 border-2 border-sky-400 border-t-transparent rounded-full animate-spin"></div>
+              <span className="text-sm font-semibold animate-pulse">Connecting...</span>
+            </div>
           </div>
 
           <div className="mt-8">
             <button
               onClick={endCall}
               className="btn btn-circle bg-red-500 hover:bg-red-600 border-none text-white w-16 h-16 shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center"
-              title="End Call"
+              title="Cancel Call"
             >
               <BsTelephoneXFill size={22} />
             </button>

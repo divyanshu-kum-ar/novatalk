@@ -53,7 +53,7 @@ const getDefaultAvatar = (gender) => {
 
 const Message = ({ message }) => {
   const { authUser } = useAuthContext();
-  const { selectedConversation, messages, setMessages, setEditingMessage, setReplyingTo, searchQuery } = useConversation();
+  const { selectedConversation, messages, setMessages, setEditingMessage, setReplyingTo, searchQuery, setForwardingMessage } = useConversation();
   const [showLightbox, setShowLightbox] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
 
@@ -62,7 +62,7 @@ const Message = ({ message }) => {
     const parts = text.split(new RegExp(`(${query.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')})`, 'gi'));
     return (
       <>
-        {parts.map((part, index) => 
+        {parts.map((part, index) =>
           part.toLowerCase() === query.toLowerCase()
             ? <mark key={index} className="bg-yellow-500 text-black rounded px-0.5">{part}</mark>
             : part
@@ -176,7 +176,7 @@ const Message = ({ message }) => {
   if (message.isCallLog) {
     const isCompleted = message.callLog?.type === "completed";
     const isVideo = message.callLog?.callType === "video";
-    
+
     let titleText = "";
     let statusText = "";
     let IconComponent = null;
@@ -299,6 +299,11 @@ const Message = ({ message }) => {
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
+        {message.isForwarded && (
+          <span className="text-[10px] text-gray-300 italic flex items-center gap-1 select-none font-medium mb-0.5">
+            ↪ Forwarded
+          </span>
+        )}
         {selectedConversation?.isGroup && !fromMe && (
           <span className="text-xs text-sky-300 font-semibold block mb-0.5 select-none">
             {typeof message.senderId === "object" && message.senderId !== null ? message.senderId.fullName : "User"}
@@ -338,11 +343,12 @@ const Message = ({ message }) => {
                 </>
               )}
               <li><button type="button" onClick={() => setReplyingTo(message)} className="hover:bg-gray-700">Reply</button></li>
+              <li><button type="button" onClick={() => setForwardingMessage(message)} className="hover:bg-gray-700">Forward</button></li>
             </ul>
           </div>
         )}
         {message.replyTo && (
-          <div 
+          <div
             onClick={(e) => {
               e.preventDefault();
               const element = document.getElementById(`msg-${message.replyTo._id}`);
@@ -363,11 +369,11 @@ const Message = ({ message }) => {
               {
                 (() => {
                   const replyToSenderId = message.replyTo.senderId?._id || message.replyTo.senderId;
-                  return replyToSenderId === authUser._id 
-                    ? "You" 
+                  return replyToSenderId === authUser._id
+                    ? "You"
                     : (typeof message.replyTo.senderId === "object" && message.replyTo.senderId !== null
-                        ? (message.replyTo.senderId.fullName || message.replyTo.senderId.username || "User")
-                        : (selectedConversation?.isGroup ? "User" : selectedConversation?.fullName));
+                      ? (message.replyTo.senderId.fullName || message.replyTo.senderId.username || "User")
+                      : (selectedConversation?.isGroup ? "User" : selectedConversation?.fullName));
                 })()
               }
             </span>
@@ -432,15 +438,14 @@ const Message = ({ message }) => {
                   e.stopPropagation();
                   handleReactionClick(emoji, userNames);
                 }}
-                className={`group/react relative flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs cursor-pointer select-none transition-all ${
-                  hasReacted
+                className={`group/react relative flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs cursor-pointer select-none transition-all ${hasReacted
                     ? "bg-blue-600 bg-opacity-30 border border-blue-500 text-white"
                     : "bg-gray-800 bg-opacity-50 border border-gray-700 text-gray-300 hover:bg-gray-700"
-                }`}
+                  }`}
               >
                 <span>{emoji}</span>
                 <span className="font-semibold">{users.length}</span>
-                
+
                 <div className={`absolute bottom-full mb-2 hidden group-hover/react:block bg-gray-900 text-white text-[10px] rounded py-1 px-2 whitespace-nowrap z-[100] shadow-lg border border-gray-700 ${fromMe ? "right-0" : "left-0"}`}>
                   {userNames}
                 </div>

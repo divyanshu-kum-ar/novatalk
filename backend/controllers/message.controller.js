@@ -506,3 +506,143 @@ export const createCallLog = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
+export const forwardMessage = async (req, res) => {
+  try {
+    const { messageId, targetChatIds } = req.body;
+    const senderId = req.user._id;
+
+    if (!messageId || !targetChatIds || !Array.isArray(targetChatIds) || targetChatIds.length === 0) {
+      return res.status(400).json({ error: "Invalid request payload" });
+    }
+
+    const sourceMessage = await Message.findById(messageId);
+    if (!sourceMessage) {
+      return res.status(404).json({ error: "Source message not found" });
+    }
+
+    const forwardedMessages = [];
+
+    for (const targetId of targetChatIds) {
+      // 1. Try to find if it is a Group conversation
+      let conversation = await Conversation.findOne({
+        _id: targetId,
+        isGroup: true,
+      });
+
+      let isGroupChat = false;
+      if (conversation) {
+        isGroupChat = true;
+        // Verify sender belongs to destination conversation
+        const isParticipant = conversation.participants.some(
+          (pId) => pId.toString() === senderId.toString()
+        );
+        if (!isParticipant) {
+          continue;
+        }
+      } else {
+        // Check if there is an existing 1-to-1 conversation by ID
+        conversation = await Conversation.findOne({
+          _id: targetId,
+          isGroup: { $ne: true },
+        });
+
+        // If not found by conversation ID, check if targetId is another User ID
+        if (!conversation) {
+          const targetUser = await User.findById(targetId);
+          if (targetUser) {
+            // Find or create 1-to-1 conversation
+            conversation = await Conversation.findOne({
+              participants: { $all: [senderId, targetId] },
+              isGroup: { $ne: true },
+            });
+
+            if (!conversation) {
+              conversation = await Conversation.create({
+                participants: [senderId, targetId],
+              });
+            }
+          } else {
+            continue;
+          }
+        } else {
+          // Verify sender belongs to destination conversation
+          const isParticipant = conversation.participants.some(
+            (pId) => pId.toString() === senderId.toString()
+          );
+          if (!isParticipant) {
+            continue;
+          }
+        }
+      }
+
+      // Determine receiverId for 1-to-1 chat
+      let receiverId = null;
+      if (!isGroupChat) {
+        receiverId = conversation.participants.find(
+          (pId) => pId.toString() !== senderId.toString()
+        );
+      }
+
+      const receiverSocketId = isGroupChat ? null : (receiverId ? getReceiverSocketId(receiverId) : null);
+
+      const newMsg = new Message({
+        senderId,
+        receiverId: isGroupChat ? null : receiverId,
+        message: sourceMessage.message || "",
+        image: sourceMessage.image || null,
+        file: sourceMessage.file || null,
+        fileName: sourceMessage.fileName || null,
+        fileSize: sourceMessage.fileSize || null,
+        replyTo: sourceMessage.replyTo || null,
+        isForwarded: true,
+        status: isGroupChat ? "sent" : (receiverSocketId ? "delivered" : "sent"),
+      });
+
+      conversation.messages.push(newMsg._id);
+      await Promise.all([conversation.save(), newMsg.save()]);
+
+      await newMsg.populate({
+        path: "senderId",
+        select: "username fullName profilePic gender"
+      });
+
+      if (newMsg.replyTo) {
+        await newMsg.populate({
+          path: "replyTo",
+          select: "message image file fileName fileSize senderId",
+          populate: {
+            path: "senderId",
+            select: "username fullName"
+          }
+        });
+      }
+
+      const messageResponse = newMsg.toObject();
+
+      if (isGroupChat) {
+        messageResponse.conversationId = conversation._id.toString();
+        conversation.participants.forEach((pId) => {
+          if (pId.toString() !== senderId.toString()) {
+            const pSocketId = getReceiverSocketId(pId);
+            if (pSocketId) {
+              io.to(pSocketId).emit("newMessage", messageResponse);
+            }
+          }
+        });
+      } else {
+        if (receiverSocketId) {
+          io.to(receiverSocketId).emit("newMessage", messageResponse);
+        }
+      }
+
+      forwardedMessages.push(messageResponse);
+    }
+
+    res.status(201).json(forwardedMessages);
+  } catch (error) {
+    console.log("Error in forwardMessage controller:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+

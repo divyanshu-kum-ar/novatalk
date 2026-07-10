@@ -3,6 +3,8 @@ import { getRandomEmoji } from "../../utils/emojis";
 import Conversation from "./Conversation";
 import useGetConversations from "./../../hooks/useGetConversations";
 import useConversation from "../../zustand/useConversation";
+import { ChatListSkeleton } from "../skeletons/Skeletons";
+import EmptyState from "../EmptyState";
 
 const Conversations = () => {
   const { loading, conversations } = useGetConversations();
@@ -38,19 +40,31 @@ const Conversations = () => {
   });
 
   return (
-    <div className="py-2 flex flex-col overflow-auto">
-      {sortedConversations.map((conversation, idx) => (
-        <Conversation
-          key={conversation._id}
-          conversation={conversation}
-          emoji={getRandomEmoji()}
-          lastIdx={idx === sortedConversations.length - 1}
-        />
-      ))}
-
+    <div className="py-2 flex flex-col overflow-auto h-full min-h-[300px]">
       {loading ? (
-        <span className="loading loading-spinner mx-auto"></span>
-      ) : null}
+        <ChatListSkeleton />
+      ) : sortedConversations.length > 0 ? (
+        sortedConversations.map((conversation, idx) => (
+          <Conversation
+            key={conversation._id}
+            conversation={conversation}
+            emoji={getRandomEmoji()}
+            lastIdx={idx === sortedConversations.length - 1}
+          />
+        ))
+      ) : viewArchived ? (
+        <EmptyState
+          type="archive"
+          title="No archived chats"
+          subtitle="Conversations you archive will appear here."
+        />
+      ) : (
+        <EmptyState
+          type="chats"
+          title="No conversations yet"
+          subtitle="Start a new conversation to begin chatting."
+        />
+      )}
     </div>
   );
 };

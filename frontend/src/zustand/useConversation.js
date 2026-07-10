@@ -24,6 +24,8 @@ const useConversation = create((set) => ({
   setArchivedChatIds: (archivedChatIds) => set({ archivedChatIds }),
   viewArchived: false,
   setViewArchived: (viewArchived) => set({ viewArchived }),
+  forwardingMessage: null,
+  setForwardingMessage: (forwardingMessage) => set({ forwardingMessage }),
 }));
 
 export default useConversation;
