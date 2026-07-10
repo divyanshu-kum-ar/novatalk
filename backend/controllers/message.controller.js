@@ -6,9 +6,26 @@ import { sanitizeUserProfile } from "./user.controller.js";
 
 export const sendMessage = async (req, res) => {
   try {
-    const { message, image, file, fileName, fileSize, replyTo } = req.body;
+    const { message, image, file, fileName, fileSize, replyTo, video, videoName, videoSize } = req.body;
     const { id: receiverId } = req.params; // receiverId can be user ID or group Conversation ID
     const senderId = req.user._id;
+
+    // Validation for video if present
+    if (video) {
+      if (!videoName || !videoSize) {
+        return res.status(400).json({ error: "Video name and size are required for video attachment" });
+      }
+
+      const allowedExtensions = ["mp4", "webm", "mov"];
+      const extension = videoName.split('.').pop().toLowerCase();
+      if (!allowedExtensions.includes(extension)) {
+        return res.status(400).json({ error: "Unsupported video type. Allowed: MP4, WEBM, MOV" });
+      }
+
+      if (videoSize > 100 * 1024 * 1024) {
+        return res.status(400).json({ error: "Video size must be less than 100 MB" });
+      }
+    }
 
     // Validation for files if present
     if (file) {
@@ -37,7 +54,17 @@ export const sendMessage = async (req, res) => {
     if (conversation) {
       isGroupChat = true;
     } else {
-      // 1-to-1 conversation check/creation
+      // Block validation
+      const sender = await User.findById(senderId).select("blockedUsers");
+      const receiver = await User.findById(receiverId).select("blockedUsers");
+
+      if (sender && (sender.blockedUsers || []).some(id => id.toString() === receiverId.toString())) {
+        return res.status(400).json({ error: "You have blocked this user" });
+      }
+      if (receiver && (receiver.blockedUsers || []).some(id => id.toString() === senderId.toString())) {
+        return res.status(400).json({ error: "You are blocked by this user" });
+      }
+
       conversation = await Conversation.findOne({
         participants: { $all: [senderId, receiverId] },
         isGroup: { $ne: true },
@@ -61,6 +88,9 @@ export const sendMessage = async (req, res) => {
       file: file || null,
       fileName: fileName || null,
       fileSize: fileSize || null,
+      video: video || null,
+      videoName: videoName || null,
+      videoSize: videoSize || null,
       replyTo: replyTo || null,
       status: isGroupChat ? "sent" : (receiverSocketId ? "delivered" : "sent"),
     });
@@ -80,7 +110,7 @@ export const sendMessage = async (req, res) => {
     if (newMessage.replyTo) {
       await newMessage.populate({
         path: "replyTo",
-        select: "message image file fileName fileSize senderId",
+        select: "message image file fileName fileSize video videoName videoSize senderId",
         populate: {
           path: "senderId",
           select: "username fullName"
@@ -183,18 +213,24 @@ export const getMessages = async (req, res) => {
     if (!conversation.isGroup) {
       const otherUser = await User.findById(userToChatId);
       const currentUser = await User.findById(senderId);
-      const otherReadReceipts = otherUser?.privacySettings?.readReceipts !== false;
-      const currentReadReceipts = currentUser?.privacySettings?.readReceipts !== false;
+      
+      const isBlocked = currentUser && (currentUser.blockedUsers || []).some(id => id.toString() === userToChatId.toString());
+      const hasBlockedMe = otherUser && (otherUser.blockedUsers || []).some(id => id.toString() === senderId.toString());
 
-      if (otherReadReceipts && currentReadReceipts) {
-        await Message.updateMany(
-          { senderId: userToChatId, receiverId: senderId, status: { $ne: "read" } },
-          { $set: { status: "read" } }
-        );
+      if (!isBlocked && !hasBlockedMe) {
+        const otherReadReceipts = otherUser?.privacySettings?.readReceipts !== false;
+        const currentReadReceipts = currentUser?.privacySettings?.readReceipts !== false;
 
-        const senderSocketId = getReceiverSocketId(userToChatId);
-        if (senderSocketId) {
-          io.to(senderSocketId).emit("conversationRead", { readerId: senderId });
+        if (otherReadReceipts && currentReadReceipts) {
+          await Message.updateMany(
+            { senderId: userToChatId, receiverId: senderId, status: { $ne: "read" } },
+            { $set: { status: "read" } }
+          );
+
+          const senderSocketId = getReceiverSocketId(userToChatId);
+          if (senderSocketId) {
+            io.to(senderSocketId).emit("conversationRead", { readerId: senderId });
+          }
         }
       }
     }
@@ -645,4 +681,142 @@ export const forwardMessage = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
+export const clearChat = async (req, res) => {
+  try {
+    const { id: conversationId } = req.params;
+    const userId = req.user._id;
+
+    // Find the conversation (can be group or 1-to-1)
+    let conversation = await Conversation.findById(conversationId);
+    
+    // If not found by conversation ID, check if it's a 1-to-1 conversation with a specific User ID
+    if (!conversation) {
+      conversation = await Conversation.findOne({
+        participants: { $all: [userId, conversationId] },
+        isGroup: { $ne: true }
+      });
+    }
+
+    if (!conversation) {
+      return res.status(404).json({ error: "Conversation not found" });
+    }
+
+    // Verify participant
+    const isParticipant = conversation.participants.some(
+      (pId) => pId.toString() === userId.toString()
+    );
+    if (!isParticipant) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    // Add user ID to deletedFor in all messages of this conversation
+    await Message.updateMany(
+      { _id: { $in: conversation.messages }, deletedFor: { $ne: userId } },
+      { $push: { deletedFor: userId } }
+    );
+
+    res.status(200).json({ message: "Chat cleared successfully" });
+  } catch (error) {
+    console.log("Error in clearChat controller:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+const previewCache = new Map();
+
+const getMetaTag = (html, property) => {
+  const regex = new RegExp(`<meta[^>]+(?:property|name)=["']${property}["'][^>]+content=["']([^"']+)["']`, 'i');
+  let match = html.match(regex);
+  if (!match) {
+    const altRegex = new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${property}["']`, 'i');
+    match = html.match(altRegex);
+  }
+  return match ? match[1] : null;
+};
+
+const getTitleTag = (html) => {
+  const match = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+  return match ? match[1] : null;
+};
+
+const getFavicon = (html, baseUrl) => {
+  const match = html.match(/<link[^>]+rel=["'](?:shortcut )?icon["'][^>]+href=["']([^"']+)["']/i) ||
+                html.match(/<link[^>]+href=["']([^"']+)["'][^>]+rel=["'](?:shortcut )?icon["']/i);
+  if (match) {
+    let faviconUrl = match[1];
+    if (!faviconUrl.startsWith("http")) {
+      try {
+        const urlObj = new URL(baseUrl);
+        faviconUrl = new URL(faviconUrl, urlObj.origin).href;
+      } catch (e) {}
+    }
+    return faviconUrl;
+  }
+  try {
+    const urlObj = new URL(baseUrl);
+    return `${urlObj.origin}/favicon.ico`;
+  } catch (e) {
+    return null;
+  }
+};
+
+export const getLinkPreview = async (req, res) => {
+  try {
+    let { url } = req.query;
+    if (!url) {
+      return res.status(400).json({ error: "URL query parameter is required" });
+    }
+
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      url = "https://" + url;
+    }
+
+    if (previewCache.has(url)) {
+      return res.status(200).json(previewCache.get(url));
+    }
+
+    let origin = "";
+    try {
+      const parsed = new URL(url);
+      origin = parsed.hostname;
+    } catch (e) {
+      return res.status(400).json({ error: "Invalid URL format" });
+    }
+
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      },
+      signal: AbortSignal.timeout(5000)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch URL status ${response.status}`);
+    }
+
+    const html = await response.text();
+
+    const title = getMetaTag(html, "og:title") || getTitleTag(html) || origin;
+    const description = getMetaTag(html, "og:description") || getMetaTag(html, "description") || "";
+    const image = getMetaTag(html, "og:image") || "";
+    const favicon = getFavicon(html, url);
+
+    const previewData = {
+      title,
+      description,
+      image,
+      favicon,
+      domain: origin,
+      url,
+    };
+
+    previewCache.set(url, previewData);
+    res.status(200).json(previewData);
+  } catch (error) {
+    console.log("Error in link preview controller:", error);
+    res.status(200).json({ error: "Failed to generate preview" });
+  }
+};
+
 

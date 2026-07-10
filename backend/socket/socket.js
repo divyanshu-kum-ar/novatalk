@@ -125,16 +125,23 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("typing", ({ senderId, receiverId }) => {
-    console.log(`typing event received: senderId=${senderId}, receiverId=${receiverId}`);
-    const receiverSocketId = getReceiverSocketId(receiverId);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("typing", { senderId });
+  socket.on("typing", async ({ senderId, receiverId }) => {
+    try {
+      const sender = await User.findById(senderId).select("blockedUsers");
+      const receiver = await User.findById(receiverId).select("blockedUsers");
+      if (sender && (sender.blockedUsers || []).some(id => id.toString() === receiverId.toString())) return;
+      if (receiver && (receiver.blockedUsers || []).some(id => id.toString() === senderId.toString())) return;
+
+      const receiverSocketId = getReceiverSocketId(receiverId);
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit("typing", { senderId });
+      }
+    } catch (e) {
+      console.log(e);
     }
   });
 
   socket.on("stopTyping", ({ senderId, receiverId }) => {
-    console.log(`stopTyping event received: senderId=${senderId}, receiverId=${receiverId}`);
     const receiverSocketId = getReceiverSocketId(receiverId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("stopTyping", { senderId });

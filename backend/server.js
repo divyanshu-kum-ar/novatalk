@@ -8,6 +8,7 @@ import authRoutes from "./routes/auth.routes.js";
 import messageRoutes from "./routes/message.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import groupRoutes from "./routes/group.routes.js";
+import searchRoutes from "./routes/search.routes.js";
 
 import connectToMongoDB from "./db/connectToMongoDB.js";
 import { app, server } from "./socket/socket.js";
@@ -28,6 +29,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/groups", groupRoutes);
+app.use("/api/search", searchRoutes);
 
 app.use(express.static(frontendDistPath));
 

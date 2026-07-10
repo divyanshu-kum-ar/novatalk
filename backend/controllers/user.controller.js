@@ -2,6 +2,7 @@ import User from "../models/user.model.js";
 import Conversation from "../models/conversation.model.js";
 import Message from "../models/message.model.js";
 import bcrypt from "bcryptjs";
+import { getReceiverSocketId, io } from "../socket/socket.js";
 
 export const sanitizeUserProfile = async (targetUser, requestingUserId) => {
   if (!targetUser) return null;
@@ -31,20 +32,40 @@ export const sanitizeUserProfile = async (targetUser, requestingUserId) => {
     isContact = !!conversationExists;
   }
   
-  if (privacy.lastSeen === "nobody" || (privacy.lastSeen === "contacts" && !isContact)) {
+  let isBlocked = false;
+  let hasBlockedMe = false;
+  if (requesterId) {
+    const requester = await User.findById(requesterId).select("blockedUsers");
+    if (requester) {
+      isBlocked = (requester.blockedUsers || []).some(id => id.toString() === targetId);
+    }
+    hasBlockedMe = (targetUser.blockedUsers || []).some(id => id.toString() === requesterId);
+  }
+
+  sanitized.isBlocked = isBlocked;
+  sanitized.hasBlockedMe = hasBlockedMe;
+
+  if (isBlocked || hasBlockedMe) {
     delete sanitized.lastSeen;
-  }
-  
-  if (privacy.onlineStatus === "nobody" || (privacy.onlineStatus === "contacts" && !isContact)) {
     sanitized.hideOnline = true;
-  }
-  
-  if (privacy.profilePhoto === "nobody" || (privacy.profilePhoto === "contacts" && !isContact)) {
     sanitized.profilePic = "";
-  }
-  
-  if (privacy.about === "nobody" || (privacy.about === "contacts" && !isContact)) {
     sanitized.about = "";
+  } else {
+    if (privacy.lastSeen === "nobody" || (privacy.lastSeen === "contacts" && !isContact)) {
+      delete sanitized.lastSeen;
+    }
+    
+    if (privacy.onlineStatus === "nobody" || (privacy.onlineStatus === "contacts" && !isContact)) {
+      sanitized.hideOnline = true;
+    }
+    
+    if (privacy.profilePhoto === "nobody" || (privacy.profilePhoto === "contacts" && !isContact)) {
+      sanitized.profilePic = "";
+    }
+    
+    if (privacy.about === "nobody" || (privacy.about === "contacts" && !isContact)) {
+      sanitized.about = "";
+    }
   }
   
   return sanitized;
@@ -327,6 +348,100 @@ export const deleteProfile = async (req, res) => {
     res.status(200).json({ message: "Account deleted successfully" });
   } catch (error) {
     console.log("Error in deleteProfile controller:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+export const blockUser = async (req, res) => {
+  try {
+    const { id: userToBlockId } = req.params;
+    const userId = req.user._id;
+
+    if (userToBlockId === userId.toString()) {
+      return res.status(400).json({ error: "You cannot block yourself" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (!user.blockedUsers) {
+      user.blockedUsers = [];
+    }
+
+    if (user.blockedUsers.includes(userToBlockId)) {
+      return res.status(400).json({ error: "User is already blocked" });
+    }
+
+    user.blockedUsers.push(userToBlockId);
+    await user.save();
+
+    // Real-time update via Socket.IO: emit to both block initiator and the blocked user
+    const initiatorSocketId = getReceiverSocketId(userId);
+    const targetSocketId = getReceiverSocketId(userToBlockId);
+
+    if (initiatorSocketId) {
+      io.to(initiatorSocketId).emit("userBlocked", { userId: userToBlockId, blockedByMe: true });
+    }
+    if (targetSocketId) {
+      io.to(targetSocketId).emit("userBlocked", { userId: userId.toString(), blockedByMe: false });
+    }
+
+    res.status(200).json({ message: "User blocked successfully", blockedUsers: user.blockedUsers });
+  } catch (error) {
+    console.log("Error in blockUser controller:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+export const unblockUser = async (req, res) => {
+  try {
+    const { id: userToUnblockId } = req.params;
+    const userId = req.user._id;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (!user.blockedUsers || !user.blockedUsers.includes(userToUnblockId)) {
+      return res.status(400).json({ error: "User is not blocked" });
+    }
+
+    user.blockedUsers = user.blockedUsers.filter(
+      (id) => id.toString() !== userToUnblockId
+    );
+    await user.save();
+
+    // Real-time update via Socket.IO
+    const initiatorSocketId = getReceiverSocketId(userId);
+    const targetSocketId = getReceiverSocketId(userToUnblockId);
+
+    if (initiatorSocketId) {
+      io.to(initiatorSocketId).emit("userUnblocked", { userId: userToUnblockId, unblockedByMe: true });
+    }
+    if (targetSocketId) {
+      io.to(targetSocketId).emit("userUnblocked", { userId: userId.toString(), unblockedByMe: false });
+    }
+
+    res.status(200).json({ message: "User unblocked successfully", blockedUsers: user.blockedUsers });
+  } catch (error) {
+    console.log("Error in unblockUser controller:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+export const getBlockedUsers = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const user = await User.findById(userId).populate("blockedUsers", "fullName username profilePic gender about");
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    res.status(200).json(user.blockedUsers || []);
+  } catch (error) {
+    console.log("Error in getBlockedUsers controller:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 };

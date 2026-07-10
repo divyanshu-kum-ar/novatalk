@@ -26,6 +26,15 @@ const messageSchema = new mongoose.Schema(
     fileSize: {
       type: Number,
     },
+    video: {
+      type: String,
+    },
+    videoName: {
+      type: String,
+    },
+    videoSize: {
+      type: Number,
+    },
     edited: {
       type: Boolean,
       default: false,
@@ -82,6 +91,10 @@ const messageSchema = new mongoose.Schema(
       default: false,
     },
     isForwarded: {
+      type: Boolean,
+      default: false,
+    },
+    isSystem: {
       type: Boolean,
       default: false,
     },
