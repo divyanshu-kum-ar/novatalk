@@ -3,14 +3,16 @@ import { useState } from "react";
 import MessageInput from "./MessageInput";
 import Messages from "./Messages";
 import { TiMessages } from "react-icons/ti";
-import { BsTelephoneFill, BsCameraVideoFill, BsSearch, BsChevronUp, BsChevronDown, BsX } from "react-icons/bs";
+import { BsTelephoneFill, BsCameraVideoFill, BsSearch, BsChevronUp, BsChevronDown, BsX, BsThreeDotsVertical } from "react-icons/bs";
 import useConversation from "./../../zustand/useConversation";
+import useClearChat from "../../hooks/useClearChat";
 import { useEffect } from "react";
 import { useAuthContext } from "../../context/AuthContext";
 import ManageGroupModal from "./ManageGroupModal";
 import ForwardModal from "./ForwardModal";
 import { useCallContext } from "../../context/CallContext";
 import EmptyState from "../EmptyState";
+import toast from "react-hot-toast";
 
 const MessageContainer = () => {
   const { authUser } = useAuthContext();
@@ -20,6 +22,51 @@ const MessageContainer = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [tick, setTick] = useState(0);
   const [isManageOpen, setIsManageOpen] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const { clearChat, loading: clearing } = useClearChat();
+  const [showBlockConfirm, setShowBlockConfirm] = useState(false);
+  const [blocking, setBlocking] = useState(false);
+
+  const handleBlockUnblock = async () => {
+    setBlocking(true);
+    const endpoint = selectedConversation.isBlocked ? `/api/users/unblock/${selectedConversation._id}` : `/api/users/block/${selectedConversation._id}`;
+    const action = selectedConversation.isBlocked ? "unblocked" : "blocked";
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      // Local state update
+      const state = useConversation.getState();
+      state.setConversations(
+        state.conversations.map((c) => {
+          if (c._id === selectedConversation._id) {
+            return {
+              ...c,
+              isBlocked: !selectedConversation.isBlocked,
+            };
+          }
+          return c;
+        })
+      );
+      setSelectedConversation({
+        ...selectedConversation,
+        isBlocked: !selectedConversation.isBlocked,
+      });
+
+      toast.success(`User ${action} successfully!`);
+      setShowBlockConfirm(false);
+    } catch (err) {
+      toast.error(err.message || `Failed to ${action} user`);
+    } finally {
+      setBlocking(false);
+    }
+  };
 
   const [showSearchBar, setShowSearchBar] = useState(false);
   const [searchVal, setSearchVal] = useState("");
@@ -230,14 +277,14 @@ const MessageContainer = () => {
                 <span className="label-text text-gray-200">To:</span>{" "}
                 <span className="text-gray-900 font-bold flex items-center gap-2">
                   {isGroup ? selectedConversation.groupName : selectedConversation.fullName}
-                  {isCreator && (
+                  {isGroup && (
                     <button
                       type="button"
                       onClick={() => setIsManageOpen(true)}
                       className="text-xs bg-slate-700 hover:bg-slate-600 text-white font-semibold px-2 py-0.5 rounded transition-colors"
-                      title="Manage Group Settings"
+                      title="Group Info"
                     >
-                      Manage
+                      Group Info
                     </button>
                   )}
                 </span>
@@ -293,6 +340,39 @@ const MessageContainer = () => {
                   </button>
                 </div>
               )}
+              {/* Three-dot dropdown menu */}
+              <div className="dropdown dropdown-bottom dropdown-end">
+                <div tabIndex={0} role="button" className="w-8 h-8 rounded-full bg-slate-700 hover:bg-slate-600 hover:scale-105 active:scale-95 text-white flex items-center justify-center transition-all duration-200 shadow-md cursor-pointer" title="Options">
+                  <BsThreeDotsVertical size={14} />
+                </div>
+                <ul tabIndex={0} className="dropdown-content z-20 menu p-1 shadow bg-gray-800 border border-gray-700 rounded-box w-36 text-xs text-white mt-1">
+                  <li>
+                    <button type="button" onClick={() => setShowSearchBar(!showSearchBar)} className="hover:bg-gray-700 py-2">
+                      Search in Chat
+                    </button>
+                  </li>
+                  <li>
+                    <button type="button" onClick={() => setShowClearConfirm(true)} className="text-red-500 hover:text-red-400 hover:bg-gray-700 py-2">
+                      Clear Chat
+                    </button>
+                  </li>
+                  {!isGroup && (
+                    <li>
+                      <button
+                        type="button"
+                        onClick={() => setShowBlockConfirm(true)}
+                        className={`${
+                          selectedConversation.isBlocked
+                            ? "text-green-400 hover:text-green-300"
+                            : "text-red-500 hover:text-red-400"
+                        } hover:bg-gray-700 py-2`}
+                      >
+                        {selectedConversation.isBlocked ? "✅ Unblock User" : "🚫 Block User"}
+                      </button>
+                    </li>
+                  )}
+                </ul>
+              </div>
             </div>
           </div>
 
@@ -370,6 +450,85 @@ const MessageContainer = () => {
             onClose={() => setForwardingMessage(null)}
             messageToForward={forwardingMessage}
           />
+
+          {showClearConfirm && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-65 backdrop-blur-sm p-4" onClick={(e) => e.stopPropagation()}>
+              <div className="bg-gray-800 border border-gray-700 w-full max-w-sm rounded-2xl shadow-2xl p-6 flex flex-col gap-4">
+                <h3 className="text-lg font-bold text-white">Clear Chat</h3>
+                <p className="text-sm text-gray-300">
+                  This will remove all messages from this conversation for you.
+                </p>
+                <div className="flex justify-end gap-3 mt-2">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowClearConfirm(false);
+                    }}
+                    className="btn btn-sm h-9 btn-ghost text-gray-400 hover:text-white rounded-xl px-4 text-xs font-medium transition-all"
+                    disabled={clearing}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      const res = await clearChat(selectedConversation._id);
+                      if (res.success) {
+                        setShowClearConfirm(false);
+                      }
+                    }}
+                    className="btn btn-sm h-9 bg-red-500 hover:bg-red-600 active:scale-95 text-white border-none rounded-xl px-5 text-xs font-semibold tracking-wide shadow-lg transition-all"
+                    disabled={clearing}
+                  >
+                    {clearing ? <span className="loading loading-spinner loading-xs"></span> : "Clear Chat"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showBlockConfirm && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-65 backdrop-blur-sm p-4" onClick={(e) => e.stopPropagation()}>
+              <div className="bg-gray-800 border border-gray-700 w-full max-w-sm rounded-2xl shadow-2xl p-6 flex flex-col gap-4">
+                <h3 className="text-lg font-bold text-white">
+                  {selectedConversation.isBlocked ? "Unblock User" : "Block User"}
+                </h3>
+                {!selectedConversation.isBlocked && (
+                  <p className="text-sm text-gray-300">
+                    You won't receive messages or calls from this user until you unblock them.
+                  </p>
+                )}
+                <div className="flex justify-end gap-3 mt-2">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowBlockConfirm(false);
+                    }}
+                    className="btn btn-sm h-9 btn-ghost text-gray-400 hover:text-white rounded-xl px-4 text-xs font-medium transition-all"
+                    disabled={blocking}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      await handleBlockUnblock();
+                    }}
+                    className={`btn btn-sm h-9 ${
+                      selectedConversation.isBlocked ? "bg-sky-500 hover:bg-sky-600" : "bg-red-500 hover:bg-red-600"
+                    } active:scale-95 text-white border-none rounded-xl px-5 text-xs font-semibold tracking-wide shadow-lg transition-all`}
+                    disabled={blocking}
+                  >
+                    {blocking ? <span className="loading loading-spinner loading-xs"></span> : (selectedConversation.isBlocked ? "Unblock" : "Block")}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

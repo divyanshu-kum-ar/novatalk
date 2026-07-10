@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useSocketContext } from "../../context/SocketContext";
 import useConversation from "../../zustand/useConversation";
 import { BsThreeDotsVertical, BsPinAngleFill } from "react-icons/bs";
@@ -23,6 +24,29 @@ const Conversation = ({ conversation, lastIdx, emoji }) => {
   const isPinned = pinnedChatIds.includes(conversation._id);
   const isMuted = (mutedChatIds || []).includes(conversation._id);
   const isArchived = (archivedChatIds || []).includes(conversation._id);
+  const [draftText, setDraftText] = useState("");
+
+  useEffect(() => {
+    const checkDraft = () => {
+      const draftKey = `novatalk_draft_${conversation._id}`;
+      const saved = localStorage.getItem(draftKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.text?.trim() || parsed.replyTo) {
+          setDraftText(parsed.text || "[Reply draft]");
+          return;
+        }
+      }
+      setDraftText("");
+    };
+
+    checkDraft();
+
+    window.addEventListener("novatalk_drafts_updated", checkDraft);
+    return () => {
+      window.removeEventListener("novatalk_drafts_updated", checkDraft);
+    };
+  }, [conversation._id]);
 
   const handleTogglePin = async (e) => {
     e.stopPropagation();
@@ -94,9 +118,16 @@ const Conversation = ({ conversation, lastIdx, emoji }) => {
           </div>
         </div>
 
-        <div className="flex flex-col flex-1">
+        <div className="flex flex-col flex-1 min-w-0">
           <div className="flex gap-3 justify-between items-center">
-            <p className="font-bold text-gray-200">{isGroup ? conversation.groupName : conversation.fullName}</p>
+            <div className="flex flex-col min-w-0 flex-1">
+              <p className="font-bold text-gray-200 truncate">{isGroup ? conversation.groupName : conversation.fullName}</p>
+              {draftText && (
+                <span className="text-[10px] text-red-500 font-semibold tracking-wide mt-0.5 truncate max-w-[150px]">
+                  Draft: <span className="text-gray-300 font-normal">{draftText}</span>
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               {isPinned && <BsPinAngleFill className="text-yellow-400 rotate-[45deg]" size={14} title="Pinned Chat" />}
               {isMuted && <span className="text-[12px]" title="Muted Chat">🔕</span>}

@@ -6,7 +6,7 @@ const useSendMessage = () => {
   const [loading, setLoading] = useState(false);
   const { messages, setMessages, selectedConversation } = useConversation();
 
-  const sendMessage = async (message, image, fileData, replyToId) => {
+  const sendMessage = async (message, image, fileData, replyToId, videoData) => {
     setLoading(true);
     try {
       const res = await fetch(
@@ -22,7 +22,10 @@ const useSendMessage = () => {
             file: fileData?.file, 
             fileName: fileData?.name || fileData?.fileName, 
             fileSize: fileData?.size || fileData?.fileSize,
-            replyTo: replyToId || null
+            replyTo: replyToId || null,
+            video: videoData?.video,
+            videoName: videoData?.name || videoData?.videoName,
+            videoSize: videoData?.size || videoData?.videoSize,
           }),
         }
       );

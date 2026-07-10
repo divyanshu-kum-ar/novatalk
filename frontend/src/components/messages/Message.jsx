@@ -4,6 +4,9 @@ import useConversation from "../../zustand/useConversation";
 import { useState } from "react";
 import { BsDownload, BsFileEarmarkPdf, BsFileEarmarkWord, BsFileEarmarkText, BsFileEarmarkZip, BsFileEarmark, BsThreeDotsVertical, BsTelephoneInboundFill, BsTelephoneOutboundFill, BsTelephoneXFill, BsCameraVideoFill } from "react-icons/bs";
 import toast from "react-hot-toast";
+import LinkPreview from "./LinkPreview";
+
+const URL_REGEX = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi;
 
 const formatBytes = (bytes, decimals = 2) => {
   if (bytes === 0) return '0 Bytes';
@@ -53,7 +56,7 @@ const getDefaultAvatar = (gender) => {
 
 const Message = ({ message }) => {
   const { authUser } = useAuthContext();
-  const { selectedConversation, messages, setMessages, setEditingMessage, setReplyingTo, searchQuery, setForwardingMessage } = useConversation();
+  const { selectedConversation, messages, setMessages, setEditingMessage, setReplyingTo, searchQuery, setForwardingMessage, highlightedMessageId } = useConversation();
   const [showLightbox, setShowLightbox] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
 
@@ -69,6 +72,32 @@ const Message = ({ message }) => {
         )}
       </>
     );
+  };
+
+  const renderMessageText = (text) => {
+    if (!text) return null;
+    const parts = text.split(URL_REGEX);
+    return parts.map((part, index) => {
+      if (part.match(URL_REGEX)) {
+        let href = part;
+        if (!href.startsWith("http://") && !href.startsWith("https://")) {
+          href = "https://" + href;
+        }
+        return (
+          <a
+            key={index}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sky-300 hover:underline break-all"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {highlightText(part, searchQuery)}
+          </a>
+        );
+      }
+      return highlightText(part, searchQuery);
+    });
   };
 
   let pressTimer;
@@ -173,6 +202,18 @@ const Message = ({ message }) => {
   const fromMe = String(senderIdStr) === String(authUser._id);
   const formattedTime = extractTime(message.createdAt);
 
+  if (message.isSystem) {
+    return (
+      <div className="flex justify-center my-2.5 w-full select-none animate-fade-in">
+        <div className="px-4 py-1.5 bg-gray-800/40 backdrop-blur-md border border-gray-700/30 rounded-full max-w-[85%] sm:max-w-[70%] shadow-md text-center">
+          <span className="text-xs text-gray-300 font-medium tracking-wide">
+            {message.message}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   if (message.isCallLog) {
     const isCompleted = message.callLog?.type === "completed";
     const isVideo = message.callLog?.callType === "video";
@@ -275,23 +316,26 @@ const Message = ({ message }) => {
     return <span className="text-gray-400 ml-1 font-bold">✓</span>;
   };
 
-  return (
-    <div id={`msg-${message._id}`} className={`chat ${chatClassName}`}>
-      <div className="chat-image avatar">
-        <div className="w-10 rounded-full bg-slate-700 flex items-center justify-center">
-          <img
-            alt="Tailwind CSS chat bubble component"
-            src={profilePicSrc}
-            onError={(e) => {
-              e.target.src = getDefaultAvatar(senderGender);
-            }}
-          />
-        </div>
-      </div>
-      <div
-        className={`chat-bubble text-white ${shakeClass} ${bubbleBgColor} pb-2 flex flex-col gap-1.5 relative group ${fromMe ? "pr-7" : ""} min-w-[85px]`}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
+      const isHighlighted = highlightedMessageId === message._id;
+      const highlightClass = isHighlighted ? "ring-2 ring-yellow-400 bg-yellow-500/30 scale-[1.01] shadow-yellow-500/20 shadow-lg" : "";
+
+      return (
+        <div id={`msg-${message._id}`} className={`chat ${chatClassName}`}>
+          <div className="chat-image avatar">
+            <div className="w-10 rounded-full bg-slate-700 flex items-center justify-center">
+              <img
+                alt="Tailwind CSS chat bubble component"
+                src={profilePicSrc}
+                onError={(e) => {
+                  e.target.src = getDefaultAvatar(senderGender);
+                }}
+              />
+            </div>
+          </div>
+          <div
+            className={`chat-bubble text-white ${shakeClass} ${bubbleBgColor} ${highlightClass} pb-2 flex flex-col gap-1.5 relative group ${fromMe ? "pr-7" : ""} min-w-[85px] transition-all duration-300`}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
         onContextMenu={(e) => {
           e.preventDefault();
           setReplyingTo(message);
@@ -378,7 +422,7 @@ const Message = ({ message }) => {
               }
             </span>
             <span className="truncate max-w-[200px]">
-              {message.replyTo.image ? "📷 Photo" : message.replyTo.file ? "📎 File" : message.replyTo.message}
+              {message.replyTo.image ? "📷 Photo" : message.replyTo.video ? "🎥 Video" : message.replyTo.file ? "📎 File" : message.replyTo.message}
             </span>
           </div>
         )}
@@ -414,12 +458,45 @@ const Message = ({ message }) => {
             </button>
           </div>
         )}
+        {message.video && (
+          <div className="flex flex-col gap-1.5 max-w-[280px]">
+            <div className="relative rounded-lg overflow-hidden border border-gray-700 bg-black/60 shadow-inner flex flex-col">
+              <video
+                src={message.video}
+                controls
+                className="w-full max-h-48 object-contain rounded-t-lg bg-black"
+              />
+              <div className="flex justify-between items-center gap-2 p-2 bg-gray-800/80 backdrop-blur-sm border-t border-gray-700/50 rounded-b-lg">
+                <div className="flex flex-col min-w-0 flex-grow pr-1">
+                  <span className="text-[11px] font-medium text-white truncate" title={message.videoName}>
+                    {message.videoName}
+                  </span>
+                  <span className="text-[9px] text-gray-400">
+                    {formatBytes(message.videoSize)}
+                  </span>
+                </div>
+                <button
+                  onClick={() => downloadFile(message.video, message.videoName)}
+                  className="p-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded transition-all flex-shrink-0"
+                  title="Download video"
+                >
+                  <BsDownload size={12} />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {message.message && (
           <span className={`break-words ${message.isDeletedForEveryone ? "italic opacity-60 font-normal select-none" : ""}`}>
-            {message.isDeletedForEveryone ? message.message : highlightText(message.message, searchQuery)}
+            {message.isDeletedForEveryone ? message.message : renderMessageText(message.message)}
             {message.edited && !message.isDeletedForEveryone && <span className="text-[9px] opacity-60 ml-1.5 select-none font-normal">(edited)</span>}
           </span>
         )}
+        {(() => {
+          const urlMatch = message.message && !message.isDeletedForEveryone ? message.message.match(URL_REGEX) : null;
+          const firstUrl = urlMatch ? urlMatch[0] : null;
+          return firstUrl ? <LinkPreview url={firstUrl} /> : null;
+        })()}
       </div>
       {Object.keys(groupedReactions).length > 0 && (
         <div className={`flex flex-wrap gap-1 mt-1 max-w-[280px] ${fromMe ? "justify-end" : "justify-start"}`}>

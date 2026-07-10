@@ -118,6 +118,13 @@ export const CallContextProvider = ({ children }) => {
       return;
     }
 
+    const state = useConversation.getState();
+    const targetUser = state.conversations?.find((c) => c._id === receiverId);
+    if (targetUser && (targetUser.isBlocked || targetUser.hasBlockedMe)) {
+      toast.error("You cannot call this user.");
+      return;
+    }
+
     try {
       const isVideoCall = callType === "video";
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -304,6 +311,15 @@ export const CallContextProvider = ({ children }) => {
         socket.emit("reject-call", { to: from });
         return;
       }
+
+      const state = useConversation.getState();
+      const callerUser = state.conversations?.find((c) => c._id === from);
+      if (callerUser && (callerUser.isBlocked || callerUser.hasBlockedMe)) {
+        console.log("[CLIENT] caller is blocked/blocking, rejecting call automatically");
+        socket.emit("reject-call", { to: from });
+        return;
+      }
+
       setIncomingCall({ from, callerName, callerAvatar, isVideo });
     });
 
@@ -414,6 +430,53 @@ export const CallContextProvider = ({ children }) => {
       resetCallState();
     });
 
+    socket.on("userBlocked", ({ userId, blockedByMe }) => {
+      const state = useConversation.getState();
+      state.setConversations(
+        state.conversations.map((c) => {
+          if (c._id === userId) {
+            return {
+              ...c,
+              isBlocked: blockedByMe,
+              hasBlockedMe: !blockedByMe,
+              hideOnline: true,
+              lastSeen: null,
+              profilePic: "",
+              about: "",
+            };
+          }
+          return c;
+        })
+      );
+
+      // If active call is with this user, end it
+      const currentActive = activeCallRef.current;
+      const currentOutgoing = outgoingCallRef.current;
+      const currentIncoming = incomingCallRef.current;
+      const partnerId = currentActive?.partnerId || currentOutgoing?.to || currentIncoming?.from;
+
+      if (partnerId === userId) {
+        toast.error("Call ended because of block relationship.");
+        resetCallState();
+      }
+    });
+
+    socket.on("userUnblocked", ({ userId, unblockedByMe }) => {
+      const state = useConversation.getState();
+      state.setConversations(
+        state.conversations.map((c) => {
+          if (c._id === userId) {
+            return {
+              ...c,
+              isBlocked: unblockedByMe ? false : c.isBlocked,
+              hasBlockedMe: unblockedByMe ? c.hasBlockedMe : false,
+            };
+          }
+          return c;
+        })
+      );
+    });
+
     return () => {
       socket.off("voice-call");
       socket.off("accept-call");
@@ -422,6 +485,8 @@ export const CallContextProvider = ({ children }) => {
       socket.off("webrtc-answer");
       socket.off("ice-candidate");
       socket.off("end-call");
+      socket.off("userBlocked");
+      socket.off("userUnblocked");
     };
   }, [socket]);
 

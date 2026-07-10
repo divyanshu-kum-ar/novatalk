@@ -3,17 +3,31 @@ import useGetMessages from "../../hooks/useGetMessages";
 import MessageSkeleton from "../skeletons/MessageSkeleton";
 import Message from "./Message";
 import EmptyState from "../EmptyState";
+import useConversation from "../../zustand/useConversation";
 
 const Messages = () => {
   const { messages, loading } = useGetMessages();
+  const { highlightedMessageId, setHighlightedMessageId } = useConversation();
   const lastMessageRef = useRef();
 
   useEffect(() => {
-    // It is used for scrolling bar used in message container box
-    setTimeout(() => {
-      lastMessageRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
-  }, [messages]);
+    if (highlightedMessageId) {
+      const element = document.getElementById(`msg-${highlightedMessageId}`);
+      if (element) {
+        setTimeout(() => {
+          element.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 150);
+        const timer = setTimeout(() => {
+          setHighlightedMessageId(null);
+        }, 2000);
+        return () => clearTimeout(timer);
+      }
+    } else {
+      setTimeout(() => {
+        lastMessageRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+    }
+  }, [messages, highlightedMessageId]);
 
   return (
     <div className="px-4 flex-1 overflow-auto">

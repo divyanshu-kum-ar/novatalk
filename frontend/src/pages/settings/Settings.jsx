@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthContext } from "../../context/AuthContext";
 import useLogout from "../../hooks/useLogout";
+import useConversation from "../../zustand/useConversation";
 import toast from "react-hot-toast";
 import { applyAppearance } from "../../utils/appearance";
 import io from "socket.io-client";
@@ -183,10 +184,7 @@ const Settings = () => {
   );
 
   // Blocked Users State
-  const [blockedUsers, setBlockedUsers] = useState([
-    { id: "1", name: "Spammer Joe", username: "spammerjoe", gender: "male" },
-    { id: "2", name: "Troll Bot", username: "trollbot", gender: "female" }
-  ]);
+  const [blockedUsers, setBlockedUsers] = useState([]);
 
   // Two-Step Verification States
   const [showTwoStepModal, setShowTwoStepModal] = useState(false);
@@ -253,6 +251,24 @@ const Settings = () => {
   useEffect(() => {
     setPreviewWallpaper(wallpaper);
   }, [wallpaper]);
+
+  // Load real blocked users
+  useEffect(() => {
+    const fetchBlockedUsers = async () => {
+      try {
+        const res = await fetch("/api/users/blocked");
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        setBlockedUsers(data);
+      } catch (err) {
+        console.error("Failed to load blocked users:", err);
+      }
+    };
+
+    if (activeTab === "privacy") {
+      fetchBlockedUsers();
+    }
+  }, [activeTab]);
 
   // Device enumeration
   useEffect(() => {
@@ -429,9 +445,33 @@ const Settings = () => {
     }
   };
 
-  const handleUnblock = (userId, name) => {
-    setBlockedUsers(blockedUsers.filter(user => user.id !== userId));
-    toast.success(`Unblocked ${name}`);
+  const handleUnblock = async (userId, name) => {
+    try {
+      const res = await fetch(`/api/users/unblock/${userId}`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      setBlockedUsers(blockedUsers.filter(user => (user._id || user.id) !== userId));
+      toast.success(`Unblocked ${name}`);
+
+      // Update useConversation state conversations to isBlocked: false
+      const state = useConversation.getState();
+      state.setConversations(
+        state.conversations.map((c) => {
+          if (c._id === userId) {
+            return {
+              ...c,
+              isBlocked: false,
+            };
+          }
+          return c;
+        })
+      );
+    } catch (err) {
+      toast.error(err.message || "Failed to unblock user");
+    }
   };
 
   // Camera Preview handlers
@@ -1419,35 +1459,50 @@ const Settings = () => {
               </div>
 
               {/* Blocked Users Section */}
-              <div className="bg-slate-900 bg-opacity-40 p-3 rounded-lg border border-slate-700">
-                <span className="text-sm font-semibold block mb-2">Blocked Users</span>
+              <div className="bg-slate-900 bg-opacity-40 p-4 rounded-xl border border-slate-700">
+                <span className="text-sm font-semibold block mb-3 text-white">Blocked Users</span>
                 {blockedUsers.length === 0 ? (
-                  <p className="text-xs text-gray-400 italic">No blocked users</p>
+                  <div className="text-center py-4 flex flex-col items-center gap-1 animate-fadeIn">
+                    <span className="text-lg">🚫</span>
+                    <p className="text-xs font-semibold text-gray-200">No Blocked Users</p>
+                    <p className="text-[10px] text-gray-400">Users you block will appear here.</p>
+                  </div>
                 ) : (
-                  <div className="space-y-2">
-                    {blockedUsers.map((user) => (
-                      <div key={user.id} className="flex justify-between items-center bg-slate-800 bg-opacity-65 p-2 rounded border border-slate-700">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-semibold overflow-hidden">
-                            <img
-                              src={getDefaultAvatar(user.gender)}
-                              alt={user.name}
-                            />
+                  <div className="space-y-2.5 max-h-[220px] overflow-y-auto custom-scrollbar">
+                    {blockedUsers.map((user) => {
+                      const uId = user._id || user.id;
+                      const picSrc = user.profilePic && !user.profilePic.includes("avatar.iran.liara.run")
+                        ? user.profilePic
+                        : getDefaultAvatar(user.gender);
+
+                      return (
+                        <div key={uId} className="flex justify-between items-center bg-slate-800 bg-opacity-65 p-2.5 rounded-xl border border-slate-750 hover:border-slate-600 transition-all">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-slate-750 overflow-hidden flex items-center justify-center">
+                              <img
+                                src={picSrc}
+                                alt={user.fullName || user.name}
+                                className="object-cover w-full h-full"
+                                onError={(e) => {
+                                  e.target.src = getDefaultAvatar(user.gender);
+                                }}
+                              />
+                            </div>
+                            <div className="flex flex-col pr-1">
+                              <p className="text-xs font-bold text-white">{user.fullName || user.name}</p>
+                              <p className="text-[10px] text-gray-400 font-medium">@{user.username}</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-xs font-semibold">{user.name}</p>
-                            <p className="text-[10px] text-gray-400">@{user.username}</p>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleUnblock(uId, user.fullName || user.name)}
+                            className="btn btn-xs h-7 bg-red-650 hover:bg-red-700 active:scale-95 border-none text-white text-[10px] font-bold rounded-lg transition-all"
+                          >
+                            Unblock
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => handleUnblock(user.id, user.name)}
-                          className="btn btn-xs bg-red-800 hover:bg-red-700 border-none text-white text-[10px]"
-                        >
-                          Unblock
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

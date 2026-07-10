@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { BsSend, BsEmojiSmile, BsImage, BsPaperclip, BsFileEarmarkPdf, BsFileEarmarkWord, BsFileEarmarkText, BsFileEarmarkZip, BsFileEarmark } from "react-icons/bs";
+import { BsSend, BsEmojiSmile, BsImage, BsPaperclip, BsFileEarmarkPdf, BsFileEarmarkWord, BsFileEarmarkText, BsFileEarmarkZip, BsFileEarmark, BsPlayBtn } from "react-icons/bs";
 import useSendMessage from "../../hooks/useSendMessage";
 import useConversation from "../../zustand/useConversation";
 import { useSocketContext } from "../../context/SocketContext";
@@ -62,6 +62,9 @@ const MessageInput = () => {
   const [typingTimeout, setTypingTimeout] = useState(null);
   const uploadIntervalRef = useRef(null);
 
+  const videoInputRef = useRef(null);
+  const [selectedVideo, setSelectedVideo] = useState(null); // { video: base64, name, size }
+
   const getReplyingSnippet = (msg) => {
     if (!msg) return "";
     if (msg.image) return "📷 Photo";
@@ -100,6 +103,118 @@ const MessageInput = () => {
       setMessage("");
     }
   }, [editingMessage]);
+
+  const activeConversationIdRef = useRef(null);
+
+  // Switch chat: Save current input as draft for previous chat, load draft for new chat
+  useEffect(() => {
+    if (activeConversationIdRef.current && activeConversationIdRef.current !== selectedConversation?._id) {
+      const prevId = activeConversationIdRef.current;
+      const draftKey = `novatalk_draft_${prevId}`;
+      if (message.trim() || replyingTo) {
+        localStorage.setItem(
+          draftKey,
+          JSON.stringify({
+            text: message,
+            replyTo: replyingTo ? {
+              _id: replyingTo._id,
+              message: replyingTo.message,
+              image: replyingTo.image,
+              file: replyingTo.file,
+              fileName: replyingTo.fileName,
+              fileSize: replyingTo.fileSize,
+              senderId: replyingTo.senderId,
+            } : null,
+          })
+        );
+      } else {
+        localStorage.removeItem(draftKey);
+      }
+      window.dispatchEvent(new CustomEvent("novatalk_drafts_updated"));
+    }
+
+    if (selectedConversation?._id) {
+      const draftKey = `novatalk_draft_${selectedConversation._id}`;
+      const savedDraft = localStorage.getItem(draftKey);
+      if (savedDraft) {
+        const { text, replyTo } = JSON.parse(savedDraft);
+        setMessage(text || "");
+        setReplyingTo(replyTo || null);
+      } else {
+        setMessage("");
+        setReplyingTo(null);
+      }
+      activeConversationIdRef.current = selectedConversation._id;
+    } else {
+      setMessage("");
+      setReplyingTo(null);
+      activeConversationIdRef.current = null;
+    }
+  }, [selectedConversation]);
+
+  // Page refresh/close: Save draft for active chat
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (selectedConversation?._id) {
+        const draftKey = `novatalk_draft_${selectedConversation._id}`;
+        if (message.trim() || replyingTo) {
+          localStorage.setItem(
+            draftKey,
+            JSON.stringify({
+              text: message,
+              replyTo: replyingTo ? {
+                _id: replyingTo._id,
+                message: replyingTo.message,
+                image: replyingTo.image,
+                file: replyingTo.file,
+                fileName: replyingTo.fileName,
+                fileSize: replyingTo.fileSize,
+                senderId: replyingTo.senderId,
+              } : null,
+            })
+          );
+        } else {
+          localStorage.removeItem(draftKey);
+        }
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [message, replyingTo, selectedConversation]);
+
+  // Reply state change: Save draft immediately
+  useEffect(() => {
+    if (selectedConversation?._id) {
+      const draftKey = `novatalk_draft_${selectedConversation._id}`;
+      if (message.trim() || replyingTo) {
+        localStorage.setItem(
+          draftKey,
+          JSON.stringify({
+            text: message,
+            replyTo: replyingTo ? {
+              _id: replyingTo._id,
+              message: replyingTo.message,
+              image: replyingTo.image,
+              file: replyingTo.file,
+              fileName: replyingTo.fileName,
+              fileSize: replyingTo.fileSize,
+              senderId: replyingTo.senderId,
+            } : null,
+          })
+        );
+      } else {
+        localStorage.removeItem(draftKey);
+      }
+      window.dispatchEvent(new CustomEvent("novatalk_drafts_updated"));
+    }
+  }, [replyingTo]);
+
+  const clearDraft = () => {
+    if (selectedConversation?._id) {
+      localStorage.removeItem(`novatalk_draft_${selectedConversation._id}`);
+      window.dispatchEvent(new CustomEvent("novatalk_drafts_updated"));
+    }
+  };
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -184,6 +299,51 @@ const MessageInput = () => {
     }
   };
 
+  const handleVideoChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 100 * 1024 * 1024) {
+      toast.error("Video size must be less than 100 MB");
+      if (videoInputRef.current) videoInputRef.current.value = "";
+      return;
+    }
+
+    const allowedExtensions = ["mp4", "webm", "mov"];
+    const extension = file.name.split('.').pop().toLowerCase();
+    if (!allowedExtensions.includes(extension)) {
+      toast.error("Unsupported video format. Please upload MP4, WEBM, or MOV.");
+      if (videoInputRef.current) videoInputRef.current.value = "";
+      return;
+    }
+
+    clearImage();
+    clearFile();
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setSelectedVideo({
+        video: reader.result,
+        name: file.name,
+        size: file.size,
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const clearVideo = () => {
+    if (uploadIntervalRef.current) {
+      clearInterval(uploadIntervalRef.current);
+      uploadIntervalRef.current = null;
+    }
+    setSelectedVideo(null);
+    setUploadProgress(0);
+    setIsUploading(false);
+    if (videoInputRef.current) {
+      videoInputRef.current.value = "";
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!message && !selectedImage && !selectedFile) return;
@@ -260,18 +420,69 @@ const MessageInput = () => {
         setReplyingTo(null);
         setMessage("");
         setCursorPosition(0);
+        clearDraft();
+      }, 200);
+    } else if (selectedVideo) {
+      setIsUploading(true);
+      setUploadProgress(10);
+      uploadIntervalRef.current = setInterval(() => {
+        setUploadProgress((prev) => {
+          if (prev >= 90) {
+            clearInterval(uploadIntervalRef.current);
+            return 90;
+          }
+          return prev + 15;
+        });
+      }, 100);
+
+      await sendMessage(message, null, null, replyingTo?._id, selectedVideo);
+
+      if (uploadIntervalRef.current) clearInterval(uploadIntervalRef.current);
+      setUploadProgress(100);
+      setTimeout(() => {
+        clearVideo();
+        setReplyingTo(null);
+        setMessage("");
+        setCursorPosition(0);
+        clearDraft();
       }, 200);
     } else {
       await sendMessage(message, null, null, replyingTo?._id);
       setReplyingTo(null);
       setMessage("");
       setCursorPosition(0);
+      clearDraft();
     }
   };
 
   const handleInputChange = (e) => {
-    setMessage(e.target.value);
+    const val = e.target.value;
+    setMessage(val);
     setCursorPosition(e.target.selectionStart);
+
+    if (selectedConversation?._id) {
+      const draftKey = `novatalk_draft_${selectedConversation._id}`;
+      if (val.trim() || replyingTo) {
+        localStorage.setItem(
+          draftKey,
+          JSON.stringify({
+            text: val,
+            replyTo: replyingTo ? {
+              _id: replyingTo._id,
+              message: replyingTo.message,
+              image: replyingTo.image,
+              file: replyingTo.file,
+              fileName: replyingTo.fileName,
+              fileSize: replyingTo.fileSize,
+              senderId: replyingTo.senderId,
+            } : null,
+          })
+        );
+      } else {
+        localStorage.removeItem(draftKey);
+      }
+      window.dispatchEvent(new CustomEvent("novatalk_drafts_updated"));
+    }
 
     if (!socket || !selectedConversation || !authUser) return;
 
@@ -308,6 +519,26 @@ const MessageInput = () => {
     const newMessage = before + emoji + after;
     setMessage(newMessage);
     setShowEmojiPicker(false);
+
+    if (selectedConversation?._id) {
+      const draftKey = `novatalk_draft_${selectedConversation._id}`;
+      localStorage.setItem(
+        draftKey,
+        JSON.stringify({
+          text: newMessage,
+          replyTo: replyingTo ? {
+            _id: replyingTo._id,
+            message: replyingTo.message,
+            image: replyingTo.image,
+            file: replyingTo.file,
+            fileName: replyingTo.fileName,
+            fileSize: replyingTo.fileSize,
+            senderId: replyingTo.senderId,
+          } : null,
+        })
+      );
+      window.dispatchEvent(new CustomEvent("novatalk_drafts_updated"));
+    }
 
     const newPos = start + emoji.length;
     setCursorPosition(newPos);
@@ -435,6 +666,46 @@ const MessageInput = () => {
         </div>
       )}
 
+      {selectedVideo && (
+        <div className="relative self-start p-1 bg-gray-800 border border-gray-700 rounded-lg max-w-[200px] shadow-lg flex flex-col">
+          <video
+            src={selectedVideo.video}
+            className="h-20 w-auto rounded object-cover"
+            muted
+            disabled
+          />
+          <span className="text-[9px] text-gray-400 truncate max-w-[180px] mt-1 px-1">{selectedVideo.name}</span>
+          <button
+            type="button"
+            onClick={clearVideo}
+            className="absolute -top-1.5 -right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shadow transition-colors z-20"
+          >
+            &times;
+          </button>
+          {isUploading && (
+            <div className="absolute inset-0 bg-black bg-opacity-80 rounded-lg flex flex-col items-center justify-center p-2 space-y-1.5 z-10">
+              <span className="text-[9px] text-gray-300 font-bold uppercase tracking-wider animate-pulse">Uploading Video...</span>
+              <div className="w-full bg-gray-700 rounded-full h-1.5 overflow-hidden">
+                <div
+                  className="bg-sky-500 h-full rounded-full transition-all duration-200"
+                  style={{ width: `${uploadProgress}%` }}
+                ></div>
+              </div>
+              <div className="flex justify-between items-center w-full text-[9px] text-gray-400">
+                <span>{uploadProgress}%</span>
+                <button
+                  type="button"
+                  onClick={clearVideo}
+                  className="text-red-400 hover:text-red-300 font-bold underline transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="w-full relative flex items-center gap-2">
         <div className="relative flex items-center gap-1.5">
           <input
@@ -468,6 +739,23 @@ const MessageInput = () => {
             id="file-attachment-btn"
           >
             <BsPaperclip size={20} />
+          </button>
+
+          <input
+            type="file"
+            ref={videoInputRef}
+            onChange={handleVideoChange}
+            accept="video/mp4,video/webm,video/quicktime"
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={() => videoInputRef.current?.click()}
+            className="flex items-center justify-center p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition-all duration-200"
+            title="Attach video"
+            id="video-attachment-btn"
+          >
+            <BsPlayBtn size={20} />
           </button>
 
           <button

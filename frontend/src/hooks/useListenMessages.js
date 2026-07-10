@@ -4,8 +4,8 @@ import { useSocketContext } from "../context/SocketContext";
 import useConversation from "../zustand/useConversation";
 
 import { useAuthContext } from "../context/AuthContext";
-
 import notificationSound from "../assets/sounds/notification.mp3";
+import toast from "react-hot-toast";
 
 const useListenMessages = () => {
   const { socket } = useSocketContext();
@@ -171,6 +171,62 @@ const useListenMessages = () => {
       }
     };
 
+    const handleGroupLeft = ({ groupId, leftUserId, systemMessage, group, groupDeleted }) => {
+      const state = useConversation.getState();
+      const activeConv = state.selectedConversation;
+      const currentConvs = state.conversations;
+
+      if (activeConv && activeConv._id === groupId) {
+        if (groupDeleted) {
+          state.setSelectedConversation(null);
+          state.setConversations(currentConvs.filter((c) => c._id !== groupId));
+          toast.error("Group was deleted by admin.");
+        } else {
+          state.setSelectedConversation(group);
+          if (systemMessage) {
+            state.setMessages([...state.messages, systemMessage]);
+          }
+          state.setConversations(
+            currentConvs.map((c) => (c._id === groupId ? group : c))
+          );
+        }
+      } else {
+        if (groupDeleted) {
+          state.setConversations(currentConvs.filter((c) => c._id !== groupId));
+        } else {
+          state.setConversations(
+            currentConvs.map((c) => (c._id === groupId ? group : c))
+          );
+        }
+      }
+    };
+
+    const handleGroupUpdated = (updatedGroup) => {
+      const state = useConversation.getState();
+      const activeConv = state.selectedConversation;
+      const currentConvs = state.conversations;
+
+      const isStillParticipant = updatedGroup.participants?.some(
+        (p) => (p._id || p) === authUser._id
+      );
+
+      if (!isStillParticipant) {
+        if (activeConv && activeConv._id === updatedGroup._id) {
+          state.setSelectedConversation(null);
+          toast.error("You were removed from this group.");
+        }
+        state.setConversations(currentConvs.filter((c) => c._id !== updatedGroup._id));
+        return;
+      }
+
+      if (activeConv && activeConv._id === updatedGroup._id) {
+        state.setSelectedConversation(updatedGroup);
+      }
+      state.setConversations(
+        currentConvs.map((c) => (c._id === updatedGroup._id ? updatedGroup : c))
+      );
+    };
+
     socket?.on("newMessage", handleNewMessage);
     socket?.on("messageStatusUpdate", handleStatusUpdate);
     socket?.on("messagesDelivered", handleMessagesDelivered);
@@ -180,6 +236,8 @@ const useListenMessages = () => {
     socket?.on("messageDeletedForEveryone", handleMessageDeletedForEveryone);
     socket?.on("messageReactionUpdate", handleReactionUpdate);
     socket?.on("userOffline", handleUserOffline);
+    socket?.on("groupLeft", handleGroupLeft);
+    socket?.on("groupUpdated", handleGroupUpdated);
 
     return () => {
       socket?.off("newMessage", handleNewMessage);
@@ -191,6 +249,8 @@ const useListenMessages = () => {
       socket?.off("messageDeletedForEveryone", handleMessageDeletedForEveryone);
       socket?.off("messageReactionUpdate", handleReactionUpdate);
       socket?.off("userOffline", handleUserOffline);
+      socket?.off("groupLeft", handleGroupLeft);
+      socket?.off("groupUpdated", handleGroupUpdated);
     };
   }, [socket]);
 };

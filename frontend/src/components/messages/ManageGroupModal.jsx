@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import toast from "react-hot-toast";
 import useConversation from "../../zustand/useConversation";
 import { useAuthContext } from "../../context/AuthContext";
@@ -12,6 +13,54 @@ const ManageGroupModal = ({ isOpen, onClose, group }) => {
   const [groupAvatar, setGroupAvatar] = useState("");
   const [currentParticipants, setCurrentParticipants] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+
+  const handleLeaveGroup = async () => {
+    setLeaving(true);
+    try {
+      const res = await fetch(`/api/groups/${group._id}/leave`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      toast.success("You left the group.");
+
+      setSelectedConversation(null);
+      setConversations(conversations.filter((c) => c._id !== group._id));
+      
+      setShowLeaveConfirm(false);
+      onClose();
+    } catch (err) {
+      toast.error(err.message || "Failed to leave group");
+    } finally {
+      setLeaving(false);
+    }
+  };
+
+  const handleDeleteGroup = async () => {
+    const confirmDelete = window.confirm("Are you sure you want to delete this group? This will permanently delete the group and all its messages.");
+    if (!confirmDelete) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/groups/${group._id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      toast.success("Group deleted successfully!");
+      setSelectedConversation(null);
+      setConversations(conversations.filter((c) => c._id !== group._id));
+      onClose();
+    } catch (err) {
+      toast.error(err.message || "Failed to delete group");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (isOpen && group) {
@@ -39,39 +88,42 @@ const ManageGroupModal = ({ isOpen, onClose, group }) => {
         return;
       }
       const reader = new FileReader();
-      reader.onloadend = () => {
+      reader.onloadend = async () => {
         setGroupAvatar(reader.result);
+        setLoading(true);
+        try {
+          const res = await fetch(`/api/groups/${group._id}`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              groupAvatar: reader.result,
+            }),
+          });
+          const data = await res.json();
+          if (data.error) throw new Error(data.error);
+
+          const updatedConversations = conversations.map((c) =>
+            c._id === group._id ? data : c
+          );
+          setConversations(updatedConversations);
+          setSelectedConversation(data);
+          toast.success("Group avatar updated successfully!");
+        } catch (err) {
+          toast.error(err.message || "Failed to update group avatar");
+        } finally {
+          setLoading(false);
+        }
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handleRemoveMember = (userId) => {
-    // Creator cannot be removed
-    const creatorId = group.groupCreator?._id || group.groupCreator;
-    if (userId.toString() === creatorId.toString()) {
-      return toast.error("Creator cannot be removed from the group");
-    }
-    setCurrentParticipants(
-      currentParticipants.filter((p) => (p._id || p) !== userId)
-    );
-  };
-
-  const handleAddMember = (user) => {
-    if (!currentParticipants.some((p) => (p._id || p) === user._id)) {
-      setCurrentParticipants([...currentParticipants, user]);
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!groupName.trim()) {
-      return toast.error("Group name cannot be empty");
-    }
-
+  const handleUpdateName = async () => {
+    if (!groupName.trim() || groupName === group.groupName) return;
     setLoading(true);
     try {
-      const participantIds = currentParticipants.map((p) => p._id || p);
       const res = await fetch(`/api/groups/${group._id}`, {
         method: "PUT",
         headers: {
@@ -79,32 +131,101 @@ const ManageGroupModal = ({ isOpen, onClose, group }) => {
         },
         body: JSON.stringify({
           groupName,
-          groupAvatar,
-          participants: participantIds,
         }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
 
-      // Update conversations list in store
       const updatedConversations = conversations.map((c) =>
         c._id === group._id ? data : c
       );
       setConversations(updatedConversations);
-      // Update selected conversation in store
       setSelectedConversation(data);
-      toast.success("Group settings updated successfully!");
-      onClose();
+      toast.success("Group name updated successfully!");
     } catch (err) {
-      toast.error(err.message || "Failed to update group settings");
+      toast.error(err.message || "Failed to update group name");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRemoveMember = async (userId) => {
+    const creatorId = group.groupCreator?._id || group.groupCreator;
+    if (userId.toString() === creatorId.toString()) {
+      return toast.error("Creator cannot be removed from the group");
+    }
+
+    const updatedParticipantIds = currentParticipants
+      .map((p) => p._id || p)
+      .filter((id) => id.toString() !== userId.toString());
+
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/groups/${group._id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          participants: updatedParticipantIds,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      setCurrentParticipants(data.participants || []);
+      const updatedConversations = conversations.map((c) =>
+        c._id === group._id ? data : c
+      );
+      setConversations(updatedConversations);
+      setSelectedConversation(data);
+      toast.success("Member removed successfully!");
+    } catch (err) {
+      toast.error(err.message || "Failed to remove member");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddMember = async (user) => {
+    const updatedParticipantIds = [
+      ...currentParticipants.map((p) => p._id || p),
+      user._id,
+    ];
+
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/groups/${group._id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          participants: updatedParticipantIds,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      setCurrentParticipants(data.participants || []);
+      const updatedConversations = conversations.map((c) =>
+        c._id === group._id ? data : c
+      );
+      setConversations(updatedConversations);
+      setSelectedConversation(data);
+      toast.success("Member added successfully!");
+    } catch (err) {
+      toast.error(err.message || "Failed to add member");
     } finally {
       setLoading(false);
     }
   };
 
   const creatorId = group.groupCreator?._id || group.groupCreator;
+  const currentUserId = authUser?._id || authUser?.id;
+  const isAdmin = creatorId && currentUserId && creatorId.toString().toLowerCase() === currentUserId.toString().toLowerCase();
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-65 backdrop-blur-sm p-4 md:p-6">
       <style>{`
         .custom-scrollbar::-webkit-scrollbar {
@@ -125,7 +246,7 @@ const ManageGroupModal = ({ isOpen, onClose, group }) => {
       
       <div className="bg-gray-800 border border-gray-700 w-full max-w-[540px] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-700 flex justify-between items-center bg-gray-900/60 backdrop-blur-md">
+        <div className="px-6 py-4 border-b border-gray-700 flex justify-between items-center bg-gray-900/60 backdrop-blur-md flex-shrink-0">
           <h3 className="text-lg md:text-xl font-bold text-white tracking-wide">Manage Group</h3>
           <button 
             type="button" 
@@ -137,9 +258,8 @@ const ManageGroupModal = ({ isOpen, onClose, group }) => {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          {/* Scrollable Body */}
-          <div className="p-6 overflow-y-auto flex-1 flex flex-col gap-5 custom-scrollbar">
+        {/* Scrollable Body */}
+        <div className="p-6 overflow-y-auto flex-1 flex flex-col gap-5 custom-scrollbar">
             
             {/* Avatar Section */}
             <div className="flex flex-col items-center gap-2.5 bg-gray-900/30 p-4 rounded-xl border border-gray-700/50">
@@ -150,15 +270,17 @@ const ManageGroupModal = ({ isOpen, onClose, group }) => {
                     alt="Group Avatar"
                     className="w-full h-full object-cover"
                   />
-                  <label className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-xs font-medium opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity duration-200">
-                    Upload
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageChange}
-                      className="hidden"
-                    />
-                  </label>
+                  {isAdmin && (
+                    <label className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-xs font-medium opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity duration-200">
+                      Upload
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
                 </div>
               </div>
               <span className="text-xs text-gray-400 font-medium">Group Avatar</span>
@@ -171,10 +293,12 @@ const ManageGroupModal = ({ isOpen, onClose, group }) => {
               </label>
               <input
                 type="text"
-                className="w-full input input-bordered h-11 bg-gray-900/50 border-gray-700 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-white rounded-xl placeholder:text-gray-500 transition-all"
+                className="w-full input input-bordered h-11 bg-gray-900/50 border-gray-700 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-white rounded-xl placeholder:text-gray-500 transition-all disabled:opacity-75 disabled:cursor-not-allowed"
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
+                onBlur={handleUpdateName}
                 required
+                disabled={!isAdmin}
               />
             </div>
 
@@ -189,7 +313,7 @@ const ManageGroupModal = ({ isOpen, onClose, group }) => {
                   const memberObj = typeof member === "object" ? member : conversations.find((c) => c._id === member);
                   const name = memberObj?.fullName || (memberId === authUser._id ? authUser.fullName : "User");
                   const pic = memberObj?.profilePic || (memberId === authUser._id ? authUser.profilePic : DEFAULT_AVATAR_GENERIC);
-                  const isCreator = memberId.toString() === creatorId.toString();
+                  const isCreator = creatorId && memberId.toString() === creatorId.toString();
 
                   return (
                     <div key={memberId} className="flex justify-between items-center p-1.5 hover:bg-gray-800/80 rounded-lg">
@@ -199,9 +323,9 @@ const ManageGroupModal = ({ isOpen, onClose, group }) => {
                             <img src={pic || DEFAULT_AVATAR_GENERIC} alt={name} className="object-cover w-full h-full" />
                           </div>
                         </div>
-                        <span className="text-xs text-gray-200 font-medium">{name} {isCreator && <span className="text-[10px] text-sky-400 font-semibold">(Creator)</span>}</span>
+                        <span className="text-xs text-gray-200 font-medium">{name} {isCreator && <span className="text-[10px] text-sky-400 font-semibold">(Group Admin 👑)</span>}</span>
                       </div>
-                      {!isCreator && (
+                      {isAdmin && !isCreator && (
                         <button
                           type="button"
                           onClick={() => handleRemoveMember(memberId)}
@@ -217,68 +341,110 @@ const ManageGroupModal = ({ isOpen, onClose, group }) => {
             </div>
 
             {/* Add Members Section */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs md:text-sm font-semibold text-gray-300 tracking-wide uppercase">
-                Add Members
-              </label>
-              <div className="border border-gray-700/60 rounded-xl bg-gray-950/80 p-2 overflow-y-auto h-[120px] max-h-[120px] custom-scrollbar flex flex-col gap-1">
-                {nonMembers.map((user) => (
-                  <div key={user._id} className="flex justify-between items-center p-1.5 hover:bg-gray-800/80 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <div className="avatar">
-                        <div className="w-6 h-6 rounded-full bg-slate-700 overflow-hidden">
-                          <img src={user.profilePic || DEFAULT_AVATAR_GENERIC} alt={user.fullName} className="object-cover w-full h-full" />
+            {isAdmin && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs md:text-sm font-semibold text-gray-300 tracking-wide uppercase">
+                  Add Members
+                </label>
+                <div className="border border-gray-700/60 rounded-xl bg-gray-950/80 p-2 overflow-y-auto h-[120px] max-h-[120px] custom-scrollbar flex flex-col gap-1">
+                  {nonMembers.map((user) => (
+                    <div key={user._id} className="flex justify-between items-center p-1.5 hover:bg-gray-800/80 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <div className="avatar">
+                          <div className="w-6 h-6 rounded-full bg-slate-700 overflow-hidden">
+                            <img src={user.profilePic || DEFAULT_AVATAR_GENERIC} alt={user.fullName} className="object-cover w-full h-full" />
+                          </div>
                         </div>
+                        <span className="text-xs text-gray-200 font-medium">{user.fullName}</span>
                       </div>
-                      <span className="text-xs text-gray-200 font-medium">{user.fullName}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleAddMember(user)}
+                        className="text-sky-400 hover:text-sky-300 text-xs px-2 py-0.5 rounded hover:bg-sky-950 hover:bg-opacity-35 transition-colors"
+                      >
+                        Add
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleAddMember(user)}
-                      className="text-sky-400 hover:text-sky-300 text-xs px-2 py-0.5 rounded hover:bg-sky-950 hover:bg-opacity-35 transition-colors"
-                    >
-                      Add
-                    </button>
-                  </div>
-                ))}
-                {nonMembers.length === 0 && (
-                  <div className="text-center text-xs text-gray-500 py-4 font-medium">No other users to add</div>
-                )}
+                  ))}
+                  {nonMembers.length === 0 && (
+                    <div className="text-center text-xs text-gray-500 py-4 font-medium">No other users to add</div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Action Buttons Section removed from body (now placed vertically at bottom) */}
+            <div className="mt-2" />
 
           </div>
 
-          {/* Footer */}
-          <div className="px-6 py-4 bg-gray-900/80 border-t border-gray-700 flex justify-between items-center">
+          {/* Footer with exact vertical buttons order */}
+          <div className="px-6 py-5 bg-gray-900/80 border-t border-gray-700 flex flex-col gap-3 flex-shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="text-xs md:text-sm font-medium text-gray-400 hover:text-white transition-all flex items-center gap-1.5"
+              className="w-full btn btn-sm h-10 bg-slate-700 hover:bg-slate-650 text-white font-bold rounded-xl border-none transition-all flex items-center justify-center gap-2 text-xs md:text-sm"
             >
-              &larr; Back to Chat
+              ← Back to Chat
             </button>
-            <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setShowLeaveConfirm(true)}
+              className="w-full btn btn-sm h-10 bg-red-950/45 hover:bg-red-900 border border-red-800/50 hover:border-red-700 text-red-400 font-bold rounded-xl transition-all flex items-center justify-center gap-2 text-xs md:text-sm"
+            >
+              🚪 Leave Group
+            </button>
+            {isAdmin && (
               <button
                 type="button"
-                onClick={onClose}
-                className="btn btn-sm h-9 btn-ghost text-gray-400 hover:text-white rounded-xl px-4 text-xs md:text-sm font-medium transition-all"
-                disabled={loading}
+                onClick={handleDeleteGroup}
+                className="w-full btn btn-sm h-10 bg-red-650 hover:bg-red-750 active:scale-95 text-white border-none rounded-xl px-5 text-xs md:text-sm font-semibold tracking-wide shadow-lg transition-all flex items-center justify-center gap-2"
+              >
+                🗑 Delete Group
+              </button>
+            )}
+          </div>
+      </div>
+
+      {showLeaveConfirm && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-65 backdrop-blur-sm p-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-gray-800 border border-gray-700 w-full max-w-sm rounded-2xl shadow-2xl p-6 flex flex-col gap-4">
+            <h3 className="text-lg font-bold text-white">Leave Group</h3>
+            <p className="text-sm text-gray-300">
+              Are you sure you want to leave this group?
+            </p>
+            <p className="text-xs text-gray-400">
+              If you are the Group Admin, another member will automatically become the new admin.
+            </p>
+            <div className="flex justify-end gap-3 mt-2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowLeaveConfirm(false);
+                }}
+                className="btn btn-sm h-9 btn-ghost text-gray-400 hover:text-white rounded-xl px-4 text-xs font-medium transition-all"
+                disabled={leaving}
               >
                 Cancel
               </button>
               <button
-                type="submit"
-                className="btn btn-sm h-9 bg-sky-500 hover:bg-sky-600 active:scale-95 text-white border-none min-w-[110px] rounded-xl px-5 text-xs md:text-sm font-semibold tracking-wide shadow-lg transition-all"
-                disabled={loading}
+                type="button"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  await handleLeaveGroup();
+                }}
+                className="btn btn-sm h-9 bg-red-500 hover:bg-red-600 active:scale-95 text-white border-none rounded-xl px-5 text-xs font-semibold tracking-wide shadow-lg transition-all"
+                disabled={leaving}
               >
-                {loading ? <span className="loading loading-spinner loading-xs"></span> : "Update Group"}
+                {leaving ? <span className="loading loading-spinner loading-xs"></span> : "Leave Group"}
               </button>
             </div>
           </div>
-        </form>
-      </div>
-    </div>
+        </div>
+      )}
+    </div>,
+    document.body
   );
 };
 
