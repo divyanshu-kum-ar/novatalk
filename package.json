@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "NovaTalk - Full Stack Chat Application",
   "scripts": {
-    "build": "npm install --prefix frontend && npm run build --prefix frontend && npm install --prefix backend",
+    "build": "npm install --include=dev --prefix frontend && npm run build --prefix frontend && npm install --prefix backend",
     "start": "node backend/server.js"
   },
   "engines": {
