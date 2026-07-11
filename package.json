@@ -1,0 +1,12 @@
+{
+  "name": "novatalk",
+  "version": "1.0.0",
+  "description": "NovaTalk - Full Stack Chat Application",
+  "scripts": {
+    "build": "npm install --prefix frontend && npm run build --prefix frontend && npm install --prefix backend",
+    "start": "node backend/server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -17,7 +17,7 @@ export const SocketContextProvider = ({ children }) => {
     if (authUser) {
       const socketUrl = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
         ? "http://localhost:5000"
-        : "https://webchat-app-k8yk.onrender.com";
+        : window.location.origin;
       const socket = io(socketUrl, {
         auth: {
           userId: authUser._id,
