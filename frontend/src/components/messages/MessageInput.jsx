@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { BsSend, BsEmojiSmile, BsImage, BsPaperclip, BsFileEarmarkPdf, BsFileEarmarkWord, BsFileEarmarkText, BsFileEarmarkZip, BsFileEarmark, BsPlayBtn } from "react-icons/bs";
+import { BsSend, BsEmojiSmile, BsImage, BsPaperclip, BsFileEarmarkPdf, BsFileEarmarkWord, BsFileEarmarkText, BsFileEarmarkZip, BsFileEarmark, BsPlayBtn, BsPlusLg } from "react-icons/bs";
 import useSendMessage from "../../hooks/useSendMessage";
 import useConversation from "../../zustand/useConversation";
 import { useSocketContext } from "../../context/SocketContext";
@@ -64,6 +64,7 @@ const MessageInput = () => {
 
   const videoInputRef = useRef(null);
   const [selectedVideo, setSelectedVideo] = useState(null); // { video: base64, name, size }
+  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
 
   const getReplyingSnippet = (msg) => {
     if (!msg) return "";
@@ -77,6 +78,8 @@ const MessageInput = () => {
   const emojiButtonRef = useRef(null);
   const fileInputRef = useRef(null);
   const fileAttachmentRef = useRef(null);
+  const attachmentButtonRef = useRef(null);
+  const attachmentMenuRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -87,6 +90,14 @@ const MessageInput = () => {
         !emojiButtonRef.current.contains(event.target)
       ) {
         setShowEmojiPicker(false);
+      }
+      if (
+        attachmentMenuRef.current &&
+        !attachmentMenuRef.current.contains(event.target) &&
+        attachmentButtonRef.current &&
+        !attachmentButtonRef.current.contains(event.target)
+      ) {
+        setShowAttachmentMenu(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -708,7 +719,7 @@ const MessageInput = () => {
 
       <div className="w-full flex items-center gap-2">
         {/* Actions Row */}
-        <div className="flex items-center gap-0.5 bg-slate-800/40 border border-white/5 rounded-full px-2 py-1 shadow-inner">
+        <div className="flex items-center gap-0.5 bg-slate-800/40 border border-white/5 rounded-full px-2 py-1 shadow-inner relative">
           <input
             type="file"
             ref={fileInputRef}
@@ -716,15 +727,6 @@ const MessageInput = () => {
             accept="image/jpeg, image/jpg, image/png, image/gif, image/webp"
             className="hidden"
           />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/5 rounded-full transition-native"
-            title="Attach image"
-          >
-            <BsImage size={16} />
-          </button>
-
           <input
             type="file"
             ref={fileAttachmentRef}
@@ -732,16 +734,6 @@ const MessageInput = () => {
             accept=".pdf,.doc,.docx,.txt,.zip"
             className="hidden"
           />
-          <button
-            type="button"
-            onClick={() => fileAttachmentRef.current?.click()}
-            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/5 rounded-full transition-native"
-            title="Attach file"
-            id="file-attachment-btn"
-          >
-            <BsPaperclip size={16} />
-          </button>
-
           <input
             type="file"
             ref={videoInputRef}
@@ -749,16 +741,22 @@ const MessageInput = () => {
             accept="video/mp4,video/webm,video/quicktime"
             className="hidden"
           />
+
+          {/* Combined Attachment Trigger Button */}
           <button
             type="button"
-            onClick={() => videoInputRef.current?.click()}
-            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/5 rounded-full transition-native"
-            title="Attach video"
-            id="video-attachment-btn"
+            ref={attachmentButtonRef}
+            onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
+            className={`w-8 h-8 flex items-center justify-center rounded-full transition-native ${
+              showAttachmentMenu ? "text-sky-400 bg-sky-500/10" : "text-gray-400 hover:text-white hover:bg-white/5"
+            }`}
+            title="Attach media or files"
+            aria-label="Attach File"
           >
-            <BsPlayBtn size={16} />
+            <BsPaperclip size={16} className={`transition-transform duration-200 ${showAttachmentMenu ? "rotate-[-30deg] text-sky-450" : ""}`} />
           </button>
 
+          {/* Emoji Toggle Button */}
           <button
             type="button"
             ref={emojiButtonRef}
@@ -769,10 +767,51 @@ const MessageInput = () => {
             <BsEmojiSmile size={16} />
           </button>
 
+          {showAttachmentMenu && (
+            <div
+              ref={attachmentMenuRef}
+              className="absolute bottom-14 left-0 z-50 w-36 bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl p-1 flex flex-col gap-0.5 animate-fadeIn"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAttachmentMenu(false);
+                  fileInputRef.current?.click();
+                }}
+                className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-gray-300 hover:text-white hover:bg-slate-800 rounded-xl transition-native select-none w-full text-left font-bold"
+              >
+                <span>🖼️</span>
+                <span>Image</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAttachmentMenu(false);
+                  videoInputRef.current?.click();
+                }}
+                className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-gray-300 hover:text-white hover:bg-slate-800 rounded-xl transition-native select-none w-full text-left font-bold"
+              >
+                <span>🎥</span>
+                <span>Video</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAttachmentMenu(false);
+                  fileAttachmentRef.current?.click();
+                }}
+                className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-gray-300 hover:text-white hover:bg-slate-800 rounded-xl transition-native select-none w-full text-left font-bold"
+              >
+                <span>📄</span>
+                <span>Document</span>
+              </button>
+            </div>
+          )}
+
           {showEmojiPicker && (
             <div
               ref={emojiPickerRef}
-              className="absolute bottom-16 left-4 z-50 w-72 h-64 bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl p-3 flex flex-col gap-2 animate-fadeIn"
+              className="absolute bottom-14 left-10 z-50 w-72 h-64 bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl p-3 flex flex-col gap-2 animate-fadeIn"
             >
               <div className="text-[10px] font-bold text-gray-400 border-b border-slate-750 pb-1.5 mb-1 tracking-wider uppercase">
                 Emojis

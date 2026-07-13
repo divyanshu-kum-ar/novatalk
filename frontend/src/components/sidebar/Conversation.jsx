@@ -6,6 +6,7 @@ import { BsThreeDotsVertical, BsPinAngleFill } from "react-icons/bs";
 const DEFAULT_AVATAR_GENERIC = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23a0aec0'><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z'/></svg>";
 const DEFAULT_AVATAR_MALE = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2363b3ed'><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z'/></svg>";
 const DEFAULT_AVATAR_FEMALE = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23f687b3'><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z'/></svg>";
+const DEFAULT_GROUP_AVATAR = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2338bdf8'><path d='M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z'/></svg>";
 
 const getDefaultAvatar = (gender) => {
   if (gender === "male") return DEFAULT_AVATAR_MALE;
@@ -91,7 +92,7 @@ const Conversation = ({ conversation, lastIdx, emoji }) => {
   };
 
   const profilePicSrc = isGroup
-    ? (conversation.groupAvatar && conversation.groupAvatar !== "" ? conversation.groupAvatar : DEFAULT_AVATAR_GENERIC)
+    ? (conversation.groupAvatar && conversation.groupAvatar !== "" ? conversation.groupAvatar : DEFAULT_GROUP_AVATAR)
     : ((conversation.profilePic && !conversation.profilePic.includes("avatar.iran.liara.run"))
       ? conversation.profilePic
       : getDefaultAvatar(conversation.gender));
@@ -109,13 +110,17 @@ const Conversation = ({ conversation, lastIdx, emoji }) => {
         onClick={() => setSelectedConversation(conversation)}
       >
         <div className={`avatar ${isOnline ? "online" : ""}`}>
-          <div className="w-11 h-11 rounded-full bg-slate-800 flex items-center justify-center ring-2 ring-white/5 overflow-hidden">
+          <div className={`w-11 h-11 rounded-full flex items-center justify-center ring-2 ring-white/5 overflow-hidden transition-all duration-300 ${
+            isGroup 
+              ? (isSelected ? "bg-white/10 border border-white/20" : "bg-sky-500/10 border border-sky-500/20") 
+              : "bg-slate-800"
+          }`}>
             <img
               src={profilePicSrc}
               alt="user avatar"
               className="w-full h-full object-cover"
               onError={(e) => {
-                e.target.src = isGroup ? DEFAULT_AVATAR_GENERIC : getDefaultAvatar(conversation.gender);
+                e.target.src = isGroup ? DEFAULT_GROUP_AVATAR : getDefaultAvatar(conversation.gender);
               }}
             />
           </div>
@@ -124,9 +129,21 @@ const Conversation = ({ conversation, lastIdx, emoji }) => {
         <div className="flex flex-col flex-1 min-w-0">
           <div className="flex gap-3 justify-between items-center">
             <div className="flex flex-col min-w-0 flex-1">
-              <p className="font-semibold text-sm text-gray-100 truncate group-hover:text-white">
+              <p className={`text-sm text-gray-100 truncate group-hover:text-white flex items-center gap-1.5 ${
+                isGroup ? "font-bold text-sky-300" : "font-semibold"
+              }`}>
                 {isGroup ? conversation.groupName : conversation.fullName}
+                {isGroup && (
+                  <span className="flex-shrink-0 px-1.5 py-0.5 text-[8px] font-extrabold bg-sky-500/20 text-sky-400 border border-sky-500/25 rounded-md uppercase tracking-widest leading-none">
+                    Group
+                  </span>
+                )}
               </p>
+              {isGroup && (
+                <span className="text-[10px] text-gray-400 font-semibold select-none mt-0.5 flex items-center gap-1">
+                  👥 {conversation.participants?.length || 0} members
+                </span>
+              )}
               {draftText && (
                 <span className="text-[10px] text-red-400 font-semibold tracking-wide mt-0.5 truncate max-w-[170px]">
                   Draft: <span className="text-gray-400 font-normal">{draftText}</span>
