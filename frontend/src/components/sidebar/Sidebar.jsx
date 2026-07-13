@@ -12,27 +12,49 @@ const Sidebar = () => {
   const { viewArchived, setViewArchived } = useConversation();
 
   return (
-    <div className="border-r border-slate-500 p-4 flex flex-col">
+    <div className="flex flex-col h-full p-4 w-full">
+      {/* App Branding & Actions Header */}
+      <div className="flex justify-between items-center mb-3 px-1">
+        <h2 className="text-xl font-extrabold text-white tracking-tight bg-gradient-to-r from-sky-400 to-blue-500 bg-clip-text text-transparent">
+          NovaTalk
+        </h2>
+        <div className="flex items-center gap-2">
+          {/* Archived Chats Toggle Button */}
+          <button
+            type="button"
+            onClick={() => setViewArchived(!viewArchived)}
+            className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg ${
+              viewArchived ? "text-sky-500 bg-sky-500/10" : "text-gray-400 hover:text-white hover:bg-white/5"
+            }`}
+            title={viewArchived ? "Show Active Chats" : "Archived Chats"}
+            aria-label="Archived Chats"
+          >
+            <BiArchiveIn className="w-5 h-5 cursor-pointer" />
+          </button>
+          
+          {/* Create Group Button */}
+          <button
+            type="button"
+            onClick={() => setIsCreateOpen(true)}
+            className="w-11 h-11 rounded-full bg-sky-500 hover:bg-sky-600 text-white flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg shadow-sky-500/10 font-bold text-lg border-none"
+            title="Create Group"
+          >
+            +
+          </button>
+        </div>
+      </div>
+
       <div className="flex items-center gap-2">
         <SearchInput />
-        <button
-          type="button"
-          onClick={() => setIsCreateOpen(true)}
-          className="btn btn-circle bg-sky-500 hover:bg-sky-600 text-white border-none tooltip tooltip-bottom"
-          data-tip="Create Group"
-          title="Create Group"
-        >
-          <span className="text-xl font-bold">+</span>
-        </button>
       </div>
-      <div className="divider px-3"></div>
+      <div className="h-[1px] bg-white/5 my-3.5"></div>
 
       {viewArchived && (
-        <div className="flex items-center justify-between px-3 py-1 bg-gray-800 text-sky-400 font-semibold rounded text-sm mb-2">
+        <div className="flex items-center justify-between px-3 py-1.5 bg-slate-800/50 border border-slate-700/30 text-sky-400 font-semibold rounded-xl text-xs mb-2 animate-fadeIn">
           <span>Archived Chats</span>
           <button
             type="button"
-            className="text-xs text-gray-400 hover:text-white underline cursor-pointer"
+            className="text-[10px] text-gray-400 hover:text-white underline cursor-pointer"
             onClick={() => setViewArchived(false)}
           >
             Go Back
@@ -42,21 +64,17 @@ const Sidebar = () => {
 
       <Conversations />
 
-      <div className="flex justify-between items-center mt-auto pt-2">
-        <div className="flex items-center gap-4">
-          <LogoutButton />
-          <button
-            type="button"
-            onClick={() => setViewArchived(!viewArchived)}
-            className={`tooltip tooltip-top p-1 rounded transition-colors ${viewArchived ? "text-sky-500" : "text-white hover:text-sky-500"}`}
-            title={viewArchived ? "Show Active Chats" : "Archived Chats"}
-          >
-            <BiArchiveIn className="w-6 h-6 cursor-pointer" />
-          </button>
-        </div>
+      <div className="flex justify-between items-center mt-auto pt-3 border-t border-white/5 bg-transparent">
         <div className="flex items-center gap-3">
-          <Link to="/settings" title="App Settings">
-            <BiCog className="w-6 h-6 text-white cursor-pointer hover:text-sky-500 transition-colors" />
+          <LogoutButton />
+        </div>
+        <div className="flex items-center">
+          <Link
+            to="/settings"
+            className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200"
+            title="App Settings"
+          >
+            <BiCog className="w-5 h-5 cursor-pointer" />
           </Link>
         </div>
       </div>

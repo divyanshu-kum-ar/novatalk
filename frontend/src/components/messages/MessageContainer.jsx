@@ -3,7 +3,7 @@ import { useState } from "react";
 import MessageInput from "./MessageInput";
 import Messages from "./Messages";
 import { TiMessages } from "react-icons/ti";
-import { BsTelephoneFill, BsCameraVideoFill, BsSearch, BsChevronUp, BsChevronDown, BsX, BsThreeDotsVertical } from "react-icons/bs";
+import { BsTelephoneFill, BsCameraVideoFill, BsSearch, BsChevronUp, BsChevronDown, BsX, BsThreeDotsVertical, BsArrowLeft } from "react-icons/bs";
 import useConversation from "./../../zustand/useConversation";
 import useClearChat from "../../hooks/useClearChat";
 import { useEffect } from "react";
@@ -13,6 +13,16 @@ import ForwardModal from "./ForwardModal";
 import { useCallContext } from "../../context/CallContext";
 import EmptyState from "../EmptyState";
 import toast from "react-hot-toast";
+
+const DEFAULT_AVATAR_GENERIC = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23a0aec0'><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z'/></svg>";
+const DEFAULT_AVATAR_MALE = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2363b3ed'><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z'/></svg>";
+const DEFAULT_AVATAR_FEMALE = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23f687b3'><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z'/></svg>";
+
+const getDefaultAvatar = (gender) => {
+  if (gender === "male") return DEFAULT_AVATAR_MALE;
+  if (gender === "female") return DEFAULT_AVATAR_FEMALE;
+  return DEFAULT_AVATAR_GENERIC;
+};
 
 const MessageContainer = () => {
   const { authUser } = useAuthContext();
@@ -265,67 +275,87 @@ const MessageContainer = () => {
     };
   }, [socket, selectedConversation]);
 
+  // Define avatar path for header
+  const profilePicSrc = selectedConversation
+    ? (isGroup
+      ? (selectedConversation.groupAvatar && selectedConversation.groupAvatar !== "" ? selectedConversation.groupAvatar : DEFAULT_AVATAR_GENERIC)
+      : ((selectedConversation.profilePic && !selectedConversation.profilePic.includes("avatar.iran.liara.run"))
+        ? selectedConversation.profilePic
+        : getDefaultAvatar(selectedConversation.gender)))
+    : DEFAULT_AVATAR_GENERIC;
+
   return (
-    <div className="md:min-w-[450px] flex flex-col h-full w-full">
+    <div className="flex flex-col h-full w-full overflow-hidden">
       {!selectedConversation ? (
         <NoChatSelected />
       ) : (
         <>
-          <div className="bg-slate-500 px-4 py-2 mb-2 flex justify-between items-center">
-            <div className="flex flex-col">
-              <div className="flex items-center gap-1.5">
-                <span className="label-text text-gray-200">To:</span>{" "}
-                <span className="text-gray-900 font-bold flex items-center gap-2">
+          {/* Glassmorphic Sticky Header */}
+          <div className="sticky top-0 z-30 flex justify-between items-center px-4 py-2.5 bg-slate-900/80 backdrop-blur-md border-b border-white/5 shadow-md">
+            <div className="flex items-center gap-2 min-w-0">
+              {/* Back Button for mobile */}
+              <button
+                type="button"
+                onClick={() => setSelectedConversation(null)}
+                className="md:hidden p-2 -ml-2 text-gray-300 hover:text-white rounded-xl hover:bg-slate-800/60 active:scale-95 transition-all"
+                title="Back to Chats"
+              >
+                <BsArrowLeft className="w-5 h-5" />
+              </button>
+
+              {/* Partner/Group Avatar */}
+              <div className="avatar cursor-pointer" onClick={() => isGroup && setIsManageOpen(true)}>
+                <div className="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden ring-1 ring-white/10">
+                  <img
+                    src={profilePicSrc}
+                    alt="Chat Avatar"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.target.src = isGroup ? DEFAULT_AVATAR_GENERIC : getDefaultAvatar(selectedConversation.gender);
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Chat details */}
+              <div className="flex flex-col min-w-0">
+                <span className="text-white font-semibold text-sm truncate flex items-center gap-1.5 cursor-pointer hover:text-sky-400 transition-colors" onClick={() => isGroup && setIsManageOpen(true)}>
                   {isGroup ? selectedConversation.groupName : selectedConversation.fullName}
-                  {isGroup && (
-                    <button
-                      type="button"
-                      onClick={() => setIsManageOpen(true)}
-                      className="text-xs bg-slate-700 hover:bg-slate-600 text-white font-semibold px-2 py-0.5 rounded transition-colors"
-                      title="Group Info"
-                    >
-                      Group Info
-                    </button>
+                </span>
+                <span className="text-[10px] text-gray-400 flex items-center gap-1 font-medium mt-0.5">
+                  {isGroup ? (
+                    <span>{selectedConversation.participants?.length || 0} members</span>
+                  ) : isOnline ? (
+                    <span className="text-green-400 font-semibold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block animate-pulse"></span> Online
+                    </span>
+                  ) : (
+                    <span>{formatLastSeen(selectedConversation.lastSeen)}</span>
                   )}
                 </span>
               </div>
-              {!isGroup && selectedConversation.about && (
-                <span className="text-[10px] text-gray-300 italic font-medium mt-0.5 max-w-[300px] truncate animate-fadeIn" title={selectedConversation.about}>
-                  {selectedConversation.about}
-                </span>
-              )}
-              <span className="text-[10px] text-gray-200 flex items-center gap-1 font-medium mt-0.5">
-                {isGroup ? (
-                  <span>{selectedConversation.participants?.length || 0} members</span>
-                ) : isOnline ? (
-                  <span className="text-green-300 font-semibold flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-300 inline-block animate-pulse"></span> Online
-                  </span>
-                ) : (
-                  <span>{formatLastSeen(selectedConversation.lastSeen)}</span>
-                )}
-              </span>
             </div>
-            <div className="flex items-center gap-4">
+
+            <div className="flex items-center gap-2">
               {isTyping && (
-                <span className="text-xs text-sky-200 animate-pulse font-medium pr-1">
+                <span className="text-[11px] text-green-400 animate-pulse font-medium pr-1 select-none">
                   typing...
                 </span>
               )}
               <button
                 type="button"
                 onClick={() => setShowSearchBar(!showSearchBar)}
-                className="w-8 h-8 rounded-full bg-slate-700 hover:bg-slate-600 hover:scale-105 active:scale-95 text-white flex items-center justify-center transition-all duration-200 shadow-md"
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 hover:scale-105 active:scale-95 text-gray-300 hover:text-white flex items-center justify-center transition-all duration-200"
                 title="Search Messages"
               >
                 <BsSearch size={13} />
               </button>
               {!isGroup && (
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => startCall(selectedConversation._id, selectedConversation.fullName, selectedConversation.profilePic, "voice")}
-                    className="w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-500 hover:scale-105 active:scale-95 text-white flex items-center justify-center transition-all duration-200 shadow-md"
+                    className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 hover:scale-105 active:scale-95 text-gray-300 hover:text-white flex items-center justify-center transition-all duration-200"
                     title="Start Voice Call"
                   >
                     <BsTelephoneFill size={13} />
@@ -333,7 +363,7 @@ const MessageContainer = () => {
                   <button
                     type="button"
                     onClick={() => startCall(selectedConversation._id, selectedConversation.fullName, selectedConversation.profilePic, "video")}
-                    className="w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-500 hover:scale-105 active:scale-95 text-white flex items-center justify-center transition-all duration-200 shadow-md"
+                    className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 hover:scale-105 active:scale-95 text-gray-300 hover:text-white flex items-center justify-center transition-all duration-200"
                     title="Start Video Call"
                   >
                     <BsCameraVideoFill size={13} />
@@ -342,17 +372,17 @@ const MessageContainer = () => {
               )}
               {/* Three-dot dropdown menu */}
               <div className="dropdown dropdown-bottom dropdown-end">
-                <div tabIndex={0} role="button" className="w-8 h-8 rounded-full bg-slate-700 hover:bg-slate-600 hover:scale-105 active:scale-95 text-white flex items-center justify-center transition-all duration-200 shadow-md cursor-pointer" title="Options">
+                <div tabIndex={0} role="button" className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 hover:scale-105 active:scale-95 text-gray-300 hover:text-white flex items-center justify-center transition-all duration-200 cursor-pointer" title="Options">
                   <BsThreeDotsVertical size={14} />
                 </div>
-                <ul tabIndex={0} className="dropdown-content z-20 menu p-1 shadow bg-gray-800 border border-gray-700 rounded-box w-36 text-xs text-white mt-1">
+                <ul tabIndex={0} className="dropdown-content z-20 menu p-1 shadow-2xl bg-slate-900 border border-slate-700/80 rounded-xl w-36 text-xs text-white mt-1">
                   <li>
-                    <button type="button" onClick={() => setShowSearchBar(!showSearchBar)} className="hover:bg-gray-700 py-2">
+                    <button type="button" onClick={() => setShowSearchBar(!showSearchBar)} className="hover:bg-slate-800 py-2 rounded-lg">
                       Search in Chat
                     </button>
                   </li>
                   <li>
-                    <button type="button" onClick={() => setShowClearConfirm(true)} className="text-red-500 hover:text-red-400 hover:bg-gray-700 py-2">
+                    <button type="button" onClick={() => setShowClearConfirm(true)} className="text-red-500 hover:text-red-400 hover:bg-slate-800 py-2 rounded-lg">
                       Clear Chat
                     </button>
                   </li>
@@ -365,7 +395,7 @@ const MessageContainer = () => {
                           selectedConversation.isBlocked
                             ? "text-green-400 hover:text-green-300"
                             : "text-red-500 hover:text-red-400"
-                        } hover:bg-gray-700 py-2`}
+                        } hover:bg-slate-800 py-2 rounded-lg`}
                       >
                         {selectedConversation.isBlocked ? "✅ Unblock User" : "🚫 Block User"}
                       </button>

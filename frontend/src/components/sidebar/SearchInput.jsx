@@ -130,11 +130,11 @@ const SearchInput = () => {
 
   return (
     <div className="relative flex-1" ref={dropdownRef}>
-      <div className="flex items-center gap-2 relative">
+      <div className="flex items-center relative">
         <input
           type="text"
-          placeholder="Search users, chats, groups, messages..."
-          className="input input-bordered rounded-full bg-gray-100/10 border-gray-700/80 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-white w-full pr-10 text-sm"
+          placeholder="Search chats, messages..."
+          className="w-full h-9 pl-4 pr-9 rounded-full bg-slate-800/80 border border-slate-700/50 text-white text-xs placeholder-gray-400 focus:border-sky-500 focus:outline-none transition-native shadow-inner"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -149,10 +149,10 @@ const SearchInput = () => {
             }}
             className="absolute right-3 text-gray-400 hover:text-white transition-colors"
           >
-            <BsX size={18} />
+            <BsX size={16} />
           </button>
         ) : (
-          <IoSearchSharp className="w-5 h-5 text-gray-400 absolute right-3 pointer-events-none" />
+          <IoSearchSharp className="w-4 h-4 text-gray-400 absolute right-3 pointer-events-none" />
         )}
       </div>
 

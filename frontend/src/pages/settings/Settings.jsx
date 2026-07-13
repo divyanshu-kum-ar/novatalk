@@ -773,27 +773,35 @@ const Settings = () => {
       : getDefaultAvatar(authUser?.gender);
 
   return (
-    <div className="flex w-full max-w-4xl mx-auto h-[650px] rounded-lg border border-slate-500 overflow-hidden bg-gray-400 bg-clip-padding backdrop-filter backdrop-blur-lg bg-opacity-0 text-white shadow-2xl relative settings-container">
+    <div className="flex flex-col md:flex-row w-full h-full md:h-[93vh] md:max-w-[93vw] xl:max-w-[1200px] mx-auto md:rounded-3xl border border-white/5 md:border-white/10 overflow-hidden glass-panel text-white shadow-2xl relative settings-container animate-fadeIn">
       
       {/* LEFT NAVIGATION SIDEBAR */}
-      <div className="w-56 bg-slate-900 bg-opacity-90 border-r border-slate-700 p-4 flex flex-col justify-between">
+      <div className="w-full md:w-56 bg-slate-950/40 border-b md:border-b-0 md:border-r border-white/5 p-4 flex flex-col justify-between shrink-0 gap-3">
         <div>
-          {/* Header Back Link */}
-          <div className="flex items-center gap-3 mb-6">
-            <Link
-              to="/"
-              className="p-1.5 rounded-full hover:bg-slate-800 transition-all duration-200"
-              title="Back to Chat"
-            >
-              <FiArrowLeft className="w-4 h-4" />
-            </Link>
-            <div>
-              <h1 className="text-md font-bold tracking-wide">Settings</h1>
+          {/* Header Back Link & Title */}
+          <div className="flex items-center justify-between md:justify-start gap-3 mb-3 md:mb-6">
+            <div className="flex items-center gap-2">
+              <Link
+                to="/"
+                className="p-1.5 rounded-full hover:bg-slate-850 transition-all duration-200"
+                title="Back to Chat"
+              >
+                <FiArrowLeft className="w-4 h-4" />
+              </Link>
+              <h1 className="text-sm md:text-md font-bold tracking-wide">Settings</h1>
             </div>
+            {/* Mobile quick logout */}
+            <button
+              onClick={logout}
+              disabled={loggingOut}
+              className="md:hidden px-3 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-[10px] font-bold rounded-lg border border-red-500/20 transition-all"
+            >
+              {loggingOut ? "..." : "Logout"}
+            </button>
           </div>
 
-          {/* Navigation Items list */}
-          <nav className="space-y-1">
+          {/* Navigation Items horizontal/vertical list */}
+          <nav className="flex md:flex-col overflow-x-auto md:overflow-y-auto no-scrollbar gap-1.5 pb-2 md:pb-0 w-full">
             {[
               { id: "account", label: "Account" },
               { id: "appearance", label: "Appearance" },
@@ -807,10 +815,10 @@ const Settings = () => {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`w-full text-left px-3 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all ${
+                className={`px-3.5 py-1.5 md:py-2 rounded-xl text-xs font-semibold tracking-wide transition-all shrink-0 select-none md:w-full md:text-left ${
                   activeTab === tab.id
-                    ? "bg-sky-600 text-white shadow-md"
-                    : "text-gray-300 hover:bg-slate-800 hover:text-white"
+                    ? "bg-sky-500 text-white shadow-lg shadow-sky-500/10"
+                    : "text-gray-300 hover:bg-slate-850 hover:text-white"
                 }`}
               >
                 {tab.label}
@@ -819,12 +827,12 @@ const Settings = () => {
           </nav>
         </div>
 
-        {/* Logout action */}
-        <div className="border-t border-slate-800 pt-3">
+        {/* Logout action for desktop */}
+        <div className="hidden md:block border-t border-white/5 pt-3">
           <button
             onClick={logout}
             disabled={loggingOut}
-            className="w-full btn btn-xs bg-red-900 bg-opacity-60 hover:bg-red-800 border-none text-white transition-all text-[11px] py-1"
+            className="w-full btn btn-xs bg-red-950/40 hover:bg-red-900 border border-white/5 text-white transition-all text-[11px] py-1 rounded-xl font-bold"
           >
             {loggingOut ? <span className="loading loading-spinner"></span> : "Logout"}
           </button>

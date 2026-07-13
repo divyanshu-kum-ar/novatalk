@@ -550,23 +550,23 @@ const MessageInput = () => {
   };
 
   return (
-    <form className="px-4 my-3 flex flex-col gap-2" onSubmit={handleSubmit}>
+    <form className="px-4 pb-4 pt-2 sticky bottom-0 z-20 bg-transparent flex flex-col gap-2" onSubmit={handleSubmit}>
       {editingMessage && (
-        <div className="flex justify-between items-center bg-gray-800 px-3 py-1 rounded-lg text-xs text-gray-400 border border-gray-700 shadow-md">
-          <span className="font-semibold text-blue-400">Editing message</span>
+        <div className="flex justify-between items-center bg-slate-900/90 border border-white/5 px-3 py-1.5 rounded-2xl text-xs text-gray-400 shadow-lg backdrop-blur-md animate-fadeIn">
+          <span className="font-semibold text-sky-400">Editing message</span>
           <button 
             type="button" 
             onClick={() => setEditingMessage(null)} 
-            className="text-gray-400 hover:text-white font-bold px-1.5 py-0.5 rounded hover:bg-gray-700 transition-colors"
+            className="text-xs text-gray-400 hover:text-white font-semibold px-2 py-0.5 rounded-lg hover:bg-slate-800 transition-colors"
           >
             Cancel (Esc)
           </button>
         </div>
       )}
       {replyingTo && (
-        <div className="flex justify-between items-center bg-gray-800 px-3 py-2 rounded-lg text-xs text-gray-400 border-l-4 border-blue-500 shadow-md">
+        <div className="flex justify-between items-center bg-slate-900/90 border border-white/5 border-l-4 border-l-sky-500 px-3.5 py-2 rounded-2xl text-xs text-gray-400 shadow-lg backdrop-blur-md animate-fadeIn">
           <div className="flex flex-col min-w-0 flex-1">
-            <span className="font-semibold text-blue-400">
+            <span className="font-semibold text-sky-400 text-[11px]">
               Replying to {
                 (replyingTo.senderId?._id || replyingTo.senderId) === authUser._id 
                   ? "You" 
@@ -575,25 +575,25 @@ const MessageInput = () => {
                       : (selectedConversation?.fullName || "User"))
               }
             </span>
-            <span className="truncate max-w-[240px] text-gray-300">
+            <span className="truncate max-w-[240px] text-gray-300 mt-0.5">
               {getReplyingSnippet(replyingTo)}
             </span>
           </div>
           <button 
             type="button" 
             onClick={() => setReplyingTo(null)} 
-            className="text-gray-400 hover:text-white font-bold px-1.5 py-0.5 rounded hover:bg-gray-700 transition-colors ml-2"
+            className="text-gray-400 hover:text-white font-bold p-1 rounded-full hover:bg-slate-800 transition-colors ml-2"
           >
             &times;
           </button>
         </div>
       )}
       {selectedImage && (
-        <div className="relative self-start p-1 bg-gray-800 border border-gray-700 rounded-lg max-w-[200px] shadow-lg">
+        <div className="relative self-start p-1.5 bg-slate-900 border border-white/5 rounded-2xl max-w-[200px] shadow-lg animate-fadeIn">
           <img
             src={selectedImage}
             alt="Upload preview"
-            className="h-20 w-auto rounded object-cover"
+            className="h-20 w-auto rounded-xl object-cover"
           />
           <button
             type="button"
@@ -603,9 +603,9 @@ const MessageInput = () => {
             &times;
           </button>
           {isUploading && (
-            <div className="absolute inset-0 bg-black bg-opacity-80 rounded-lg flex flex-col items-center justify-center p-2 space-y-1.5 z-10">
-              <span className="text-[9px] text-gray-300 font-bold uppercase tracking-wider animate-pulse">Uploading Image...</span>
-              <div className="w-full bg-gray-700 rounded-full h-1.5 overflow-hidden">
+            <div className="absolute inset-0 bg-black/85 rounded-2xl flex flex-col items-center justify-center p-2 space-y-1.5 z-10">
+              <span className="text-[9px] text-gray-300 font-bold uppercase tracking-wider animate-pulse">Uploading...</span>
+              <div className="w-full bg-slate-700 rounded-full h-1 overflow-hidden">
                 <div
                   className="bg-sky-500 h-full rounded-full transition-all duration-200"
                   style={{ width: `${uploadProgress}%` }}
@@ -627,13 +627,13 @@ const MessageInput = () => {
       )}
 
       {selectedFile && (
-        <div className="relative self-start p-3 bg-gray-800 border border-gray-700 rounded-lg max-w-[280px] shadow-lg flex items-center gap-3">
-          <div className="text-blue-500">
+        <div className="relative self-start p-3 bg-slate-900 border border-white/5 rounded-2xl max-w-[280px] shadow-lg flex items-center gap-3 animate-fadeIn">
+          <div className="text-sky-400 bg-slate-800 p-2 rounded-xl">
             {getFileIcon(selectedFile.name)}
           </div>
           <div className="flex flex-col min-w-0 flex-1">
-            <span className="text-xs font-semibold text-white truncate max-w-[180px]">{selectedFile.name}</span>
-            <span className="text-[10px] text-gray-400">{formatBytes(selectedFile.size)}</span>
+            <span className="text-xs font-semibold text-white truncate max-w-[150px]">{selectedFile.name}</span>
+            <span className="text-[10px] text-gray-400 mt-0.5">{formatBytes(selectedFile.size)}</span>
           </div>
           <button
             type="button"
@@ -643,9 +643,9 @@ const MessageInput = () => {
             &times;
           </button>
           {isUploading && (
-            <div className="absolute inset-0 bg-black bg-opacity-80 rounded-lg flex flex-col items-center justify-center p-2 space-y-1.5 z-10">
-              <span className="text-[9px] text-gray-300 font-bold uppercase tracking-wider animate-pulse">Uploading File...</span>
-              <div className="w-full bg-gray-700 rounded-full h-1.5 overflow-hidden">
+            <div className="absolute inset-0 bg-black/85 rounded-2xl flex flex-col items-center justify-center p-2 space-y-1.5 z-10">
+              <span className="text-[9px] text-gray-300 font-bold uppercase tracking-wider animate-pulse">Uploading...</span>
+              <div className="w-full bg-slate-700 rounded-full h-1 overflow-hidden">
                 <div
                   className="bg-sky-500 h-full rounded-full transition-all duration-200"
                   style={{ width: `${uploadProgress}%` }}
@@ -667,10 +667,10 @@ const MessageInput = () => {
       )}
 
       {selectedVideo && (
-        <div className="relative self-start p-1 bg-gray-800 border border-gray-700 rounded-lg max-w-[200px] shadow-lg flex flex-col">
+        <div className="relative self-start p-1.5 bg-slate-900 border border-white/5 rounded-2xl max-w-[200px] shadow-lg flex flex-col animate-fadeIn">
           <video
             src={selectedVideo.video}
-            className="h-20 w-auto rounded object-cover"
+            className="h-20 w-auto rounded-xl object-cover bg-black"
             muted
             disabled
           />
@@ -683,9 +683,9 @@ const MessageInput = () => {
             &times;
           </button>
           {isUploading && (
-            <div className="absolute inset-0 bg-black bg-opacity-80 rounded-lg flex flex-col items-center justify-center p-2 space-y-1.5 z-10">
-              <span className="text-[9px] text-gray-300 font-bold uppercase tracking-wider animate-pulse">Uploading Video...</span>
-              <div className="w-full bg-gray-700 rounded-full h-1.5 overflow-hidden">
+            <div className="absolute inset-0 bg-black/85 rounded-2xl flex flex-col items-center justify-center p-2 space-y-1.5 z-10">
+              <span className="text-[9px] text-gray-300 font-bold uppercase tracking-wider animate-pulse">Uploading...</span>
+              <div className="w-full bg-slate-700 rounded-full h-1 overflow-hidden">
                 <div
                   className="bg-sky-500 h-full rounded-full transition-all duration-200"
                   style={{ width: `${uploadProgress}%` }}
@@ -706,8 +706,9 @@ const MessageInput = () => {
         </div>
       )}
 
-      <div className="w-full relative flex items-center gap-2">
-        <div className="relative flex items-center gap-1.5">
+      <div className="w-full flex items-center gap-2">
+        {/* Actions Row */}
+        <div className="flex items-center gap-0.5 bg-slate-800/40 border border-white/5 rounded-full px-2 py-1 shadow-inner">
           <input
             type="file"
             ref={fileInputRef}
@@ -718,10 +719,10 @@ const MessageInput = () => {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center justify-center p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition-all duration-200"
+            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/5 rounded-full transition-native"
             title="Attach image"
           >
-            <BsImage size={20} />
+            <BsImage size={16} />
           </button>
 
           <input
@@ -734,11 +735,11 @@ const MessageInput = () => {
           <button
             type="button"
             onClick={() => fileAttachmentRef.current?.click()}
-            className="flex items-center justify-center p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition-all duration-200"
+            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/5 rounded-full transition-native"
             title="Attach file"
             id="file-attachment-btn"
           >
-            <BsPaperclip size={20} />
+            <BsPaperclip size={16} />
           </button>
 
           <input
@@ -751,38 +752,38 @@ const MessageInput = () => {
           <button
             type="button"
             onClick={() => videoInputRef.current?.click()}
-            className="flex items-center justify-center p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition-all duration-200"
+            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/5 rounded-full transition-native"
             title="Attach video"
             id="video-attachment-btn"
           >
-            <BsPlayBtn size={20} />
+            <BsPlayBtn size={16} />
           </button>
 
           <button
             type="button"
             ref={emojiButtonRef}
             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            className="flex items-center justify-center p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition-all duration-200"
+            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/5 rounded-full transition-native"
             title="Choose emoji"
           >
-            <BsEmojiSmile size={20} />
+            <BsEmojiSmile size={16} />
           </button>
 
           {showEmojiPicker && (
             <div
               ref={emojiPickerRef}
-              className="absolute bottom-12 left-0 z-50 w-72 h-64 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl p-3 flex flex-col gap-2"
+              className="absolute bottom-16 left-4 z-50 w-72 h-64 bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl p-3 flex flex-col gap-2 animate-fadeIn"
             >
-              <div className="text-xs font-semibold text-gray-400 border-b border-gray-700 pb-1.5 mb-1">
+              <div className="text-[10px] font-bold text-gray-400 border-b border-slate-750 pb-1.5 mb-1 tracking-wider uppercase">
                 Emojis
               </div>
-              <div className="grid grid-cols-8 gap-1.5 overflow-y-auto pr-1 select-none scrollbar-thin scrollbar-thumb-gray-600">
+              <div className="grid grid-cols-8 gap-1.5 overflow-y-auto pr-1 select-none no-scrollbar">
                 {EMOJIS.map((emoji, index) => (
                   <button
                     key={index}
                     type="button"
                     onClick={() => handleEmojiSelect(emoji)}
-                    className="text-xl p-1 rounded hover:bg-gray-700 active:scale-95 transition-all flex items-center justify-center"
+                    className="text-xl p-1 rounded-lg hover:bg-slate-800 active:scale-90 transition-all flex items-center justify-center"
                   >
                     {emoji}
                   </button>
@@ -792,12 +793,13 @@ const MessageInput = () => {
           )}
         </div>
 
-        <div className="relative flex-grow">
+        {/* Input Pill Container */}
+        <div className="relative flex-grow flex items-center">
           <input
             type="text"
             ref={inputRef}
-            className="border text-sm rounded-lg block w-full p-2.5 bg-gray-700 border-gray-600 text-white pr-10"
-            placeholder={editingMessage ? "Edit message..." : "Send a message"}
+            className="w-full text-xs rounded-full py-2.5 pl-4 pr-4 bg-slate-800/80 border border-slate-700/50 text-white placeholder-gray-400 focus:border-sky-500 focus:outline-none transition-native shadow-inner"
+            placeholder={editingMessage ? "Edit message..." : "Type a message..."}
             value={message}
             onChange={handleInputChange}
             onClick={saveCursorPosition}
@@ -809,17 +811,19 @@ const MessageInput = () => {
               }
             }}
           />
-          <button
-            type="submit"
-            className="absolute inset-y-0 end-0 flex items-center pe-3 text-gray-400 hover:text-white transition-colors"
-          >
-            {loading ? (
-              <div className="loading loading-spinner"></div>
-            ) : (
-              <BsSend />
-            )}
-          </button>
         </div>
+
+        {/* Circular Floating Send Action */}
+        <button
+          type="submit"
+          className="flex-shrink-0 w-9 h-9 rounded-full bg-sky-500 hover:bg-sky-600 active:scale-95 text-white flex items-center justify-center transition-native shadow-lg shadow-sky-500/10 border-none"
+        >
+          {loading ? (
+            <div className="loading loading-spinner loading-xs"></div>
+          ) : (
+            <BsSend className="w-3.5 h-3.5 ml-0.5" />
+          )}
+        </button>
       </div>
     </form>
   );

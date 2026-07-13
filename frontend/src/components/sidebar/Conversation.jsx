@@ -101,16 +101,19 @@ const Conversation = ({ conversation, lastIdx, emoji }) => {
   return (
     <>
       <div
-        className={`flex gap-2 items-center hover:bg-sky-500 rounded p-2 py-1 cursor-pointer group
-				${isSelected ? "bg-sky-500" : ""} 
-			`}
+        className={`flex gap-3 items-center rounded-2xl p-2.5 mx-1 my-0.5 cursor-pointer transition-native group select-none ${
+          isSelected
+            ? "bg-sky-500 text-white shadow-lg shadow-sky-500/10"
+            : "hover:bg-slate-800/40 text-gray-300 active:bg-slate-800/60"
+        }`}
         onClick={() => setSelectedConversation(conversation)}
       >
         <div className={`avatar ${isOnline ? "online" : ""}`}>
-          <div className="w-12 rounded-full bg-slate-700 flex items-center justify-center">
+          <div className="w-11 h-11 rounded-full bg-slate-800 flex items-center justify-center ring-2 ring-white/5 overflow-hidden">
             <img
               src={profilePicSrc}
               alt="user avatar"
+              className="w-full h-full object-cover"
               onError={(e) => {
                 e.target.src = isGroup ? DEFAULT_AVATAR_GENERIC : getDefaultAvatar(conversation.gender);
               }}
@@ -121,38 +124,45 @@ const Conversation = ({ conversation, lastIdx, emoji }) => {
         <div className="flex flex-col flex-1 min-w-0">
           <div className="flex gap-3 justify-between items-center">
             <div className="flex flex-col min-w-0 flex-1">
-              <p className="font-bold text-gray-200 truncate">{isGroup ? conversation.groupName : conversation.fullName}</p>
+              <p className="font-semibold text-sm text-gray-100 truncate group-hover:text-white">
+                {isGroup ? conversation.groupName : conversation.fullName}
+              </p>
               {draftText && (
-                <span className="text-[10px] text-red-500 font-semibold tracking-wide mt-0.5 truncate max-w-[150px]">
-                  Draft: <span className="text-gray-300 font-normal">{draftText}</span>
+                <span className="text-[10px] text-red-400 font-semibold tracking-wide mt-0.5 truncate max-w-[170px]">
+                  Draft: <span className="text-gray-400 font-normal">{draftText}</span>
                 </span>
               )}
             </div>
             <div className="flex items-center gap-2">
-              {isPinned && <BsPinAngleFill className="text-yellow-400 rotate-[45deg]" size={14} title="Pinned Chat" />}
-              {isMuted && <span className="text-[12px]" title="Muted Chat">🔕</span>}
+              {isPinned && <BsPinAngleFill className="text-yellow-400 rotate-[45deg]" size={13} title="Pinned Chat" />}
+              {isMuted && <span className="text-[11px]" title="Muted Chat">🔕</span>}
               {unreadCount > 0 && (
-                <span className="badge badge-error badge-sm text-white font-semibold rounded-full px-1.5 min-w-[20px] h-[20px] text-center">
+                <span className="badge bg-red-500 text-white border-none text-[10px] font-bold rounded-full h-4.5 min-w-[18px] px-1 shadow-sm">
                   {unreadCount}
                 </span>
               )}
               <div className="dropdown dropdown-left dropdown-end opacity-0 group-hover:opacity-100 transition-opacity">
-                <div tabIndex={0} role="button" onClick={(e) => e.stopPropagation()} className="text-gray-400 hover:text-white cursor-pointer p-1 rounded hover:bg-black hover:bg-opacity-25">
-                  <BsThreeDotsVertical size={14} />
+                <div
+                  tabIndex={0}
+                  role="button"
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-gray-400 hover:text-white cursor-pointer p-1 rounded-lg hover:bg-black/25"
+                >
+                  <BsThreeDotsVertical size={13} />
                 </div>
-                <ul tabIndex={0} className="dropdown-content z-20 menu p-1 shadow bg-gray-800 border border-gray-700 rounded-box w-28 text-[10px] text-white">
+                <ul tabIndex={0} className="dropdown-content z-20 menu p-1 shadow-xl bg-slate-900 border border-slate-700/80 rounded-xl w-28 text-[10px] text-white">
                   <li>
-                    <button type="button" onClick={handleTogglePin} className="hover:bg-gray-700">
+                    <button type="button" onClick={handleTogglePin} className="hover:bg-slate-800 py-1.5 rounded-lg">
                       {isPinned ? "Unpin Chat" : "Pin Chat"}
                     </button>
                   </li>
                   <li>
-                    <button type="button" onClick={handleToggleMute} className="hover:bg-gray-700">
+                    <button type="button" onClick={handleToggleMute} className="hover:bg-slate-800 py-1.5 rounded-lg">
                       {isMuted ? "Unmute Chat" : "Mute Chat"}
                     </button>
                   </li>
                   <li>
-                    <button type="button" onClick={handleToggleArchive} className="hover:bg-gray-700">
+                    <button type="button" onClick={handleToggleArchive} className="hover:bg-slate-800 py-1.5 rounded-lg">
                       {isArchived ? "Unarchive Chat" : "Archive Chat"}
                     </button>
                   </li>
@@ -163,7 +173,7 @@ const Conversation = ({ conversation, lastIdx, emoji }) => {
         </div>
       </div>
 
-      {!lastIdx && <div className="divider my-0 py-0 h-1" />}
+      {!lastIdx && <div className="h-[1px] bg-white/5 mx-4 my-1" />}
     </>
   );
 };

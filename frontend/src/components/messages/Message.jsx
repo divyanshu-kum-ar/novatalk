@@ -300,7 +300,7 @@ const Message = ({ message }) => {
   const profilePic = fromMe
     ? authUser.profilePic
     : (typeof message.senderId === "object" && message.senderId !== null ? message.senderId.profilePic : selectedConversation?.profilePic);
-  const bubbleBgColor = fromMe ? "bg-blue-500" : "";
+  const bubbleBgColor = fromMe ? "bg-sky-500 text-white rounded-2xl rounded-tr-none shadow-md" : "bg-slate-800 text-slate-100 rounded-2xl rounded-tl-none border border-white/5 shadow-md";
 
   const shakeClass = message.shouldShake ? "shake" : "";
 
@@ -333,7 +333,7 @@ const Message = ({ message }) => {
             </div>
           </div>
           <div
-            className={`chat-bubble text-white ${shakeClass} ${bubbleBgColor} ${highlightClass} pb-2 flex flex-col gap-1.5 relative group ${fromMe ? "pr-7" : ""} min-w-[85px] transition-all duration-300`}
+            className={`chat-bubble text-white ${shakeClass} ${bubbleBgColor} ${highlightClass} pb-2.5 flex flex-col gap-2 relative group ${fromMe ? "pr-8" : ""} min-w-[90px] transition-all duration-300`}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
         onContextMenu={(e) => {
@@ -344,7 +344,7 @@ const Message = ({ message }) => {
         onTouchEnd={handleTouchEnd}
       >
         {message.isForwarded && (
-          <span className="text-[10px] text-gray-300 italic flex items-center gap-1 select-none font-medium mb-0.5">
+          <span className="text-[9px] text-gray-300 italic flex items-center gap-1 select-none font-medium mb-0.5">
             ↪ Forwarded
           </span>
         )}
@@ -355,7 +355,7 @@ const Message = ({ message }) => {
         )}
         {showPicker && !message.isDeletedForEveryone && (
           <div
-            className={`absolute bottom-[105%] ${fromMe ? "right-0" : "left-0"} mb-1 bg-gray-800 border border-gray-700 rounded-full py-1 px-2.5 flex gap-1.5 shadow-xl z-50 animate-fade-in`}
+            className={`absolute bottom-[105%] ${fromMe ? "right-0" : "left-0"} mb-1 bg-slate-900 border border-slate-700 rounded-full py-1 px-2.5 flex gap-1.5 shadow-2xl z-50 animate-fadeIn`}
             onMouseEnter={() => setShowPicker(true)}
             onMouseLeave={() => setShowPicker(false)}
           >
@@ -366,7 +366,7 @@ const Message = ({ message }) => {
                   e.stopPropagation();
                   handleReact(emoji);
                 }}
-                className="hover:scale-125 transition-transform text-lg p-1 focus:outline-none"
+                className="hover:scale-125 transition-transform text-lg p-0.5 focus:outline-none"
               >
                 {emoji}
               </button>
@@ -375,19 +375,19 @@ const Message = ({ message }) => {
         )}
         {!message.isDeletedForEveryone && (
           <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity dropdown dropdown-left dropdown-end z-10">
-            <div tabIndex={0} role="button" className="text-gray-300 hover:text-white cursor-pointer p-0.5 rounded hover:bg-black hover:bg-opacity-25">
-              <BsThreeDotsVertical size={14} />
+            <div tabIndex={0} role="button" className="text-gray-300 hover:text-white cursor-pointer p-0.5 rounded-lg hover:bg-black/20">
+              <BsThreeDotsVertical size={13} />
             </div>
-            <ul tabIndex={0} className="dropdown-content z-20 menu p-1 shadow bg-gray-800 border border-gray-700 rounded-box w-36 text-[10px] text-white">
+            <ul tabIndex={0} className="dropdown-content z-20 menu p-1 shadow-2xl bg-slate-900 border border-slate-700/80 rounded-xl w-32 text-[10px] text-white">
               {fromMe && (
                 <>
-                  <li><button type="button" onClick={() => setEditingMessage(message)} className="hover:bg-gray-700">Edit</button></li>
-                  <li><button type="button" onClick={() => handleDelete(message._id, "me")} className="text-red-500 hover:text-red-400 hover:bg-gray-700">Delete for Me</button></li>
-                  <li><button type="button" onClick={() => handleDelete(message._id, "everyone")} className="text-red-500 hover:text-red-400 hover:bg-gray-700">Delete for Everyone</button></li>
+                  <li><button type="button" onClick={() => setEditingMessage(message)} className="hover:bg-slate-800 rounded-lg py-1.5">Edit</button></li>
+                  <li><button type="button" onClick={() => handleDelete(message._id, "me")} className="text-red-500 hover:text-red-400 hover:bg-slate-800 rounded-lg py-1.5">Delete for Me</button></li>
+                  <li><button type="button" onClick={() => handleDelete(message._id, "everyone")} className="text-red-500 hover:text-red-400 hover:bg-slate-800 rounded-lg py-1.5">Delete for Everyone</button></li>
                 </>
               )}
-              <li><button type="button" onClick={() => setReplyingTo(message)} className="hover:bg-gray-700">Reply</button></li>
-              <li><button type="button" onClick={() => setForwardingMessage(message)} className="hover:bg-gray-700">Forward</button></li>
+              <li><button type="button" onClick={() => setReplyingTo(message)} className="hover:bg-slate-800 rounded-lg py-1.5">Reply</button></li>
+              <li><button type="button" onClick={() => setForwardingMessage(message)} className="hover:bg-slate-800 rounded-lg py-1.5">Forward</button></li>
             </ul>
           </div>
         )}
@@ -407,9 +407,9 @@ const Message = ({ message }) => {
                 }
               }
             }}
-            className="cursor-pointer mb-1 p-2 bg-black bg-opacity-20 hover:bg-opacity-30 border-l-4 border-blue-500 rounded text-xs text-gray-300 flex flex-col gap-0.5"
+            className="cursor-pointer mb-1 p-2 bg-slate-950/40 hover:bg-slate-950/60 border-l-4 border-sky-400 rounded-lg text-[10px] text-gray-300 flex flex-col gap-0.5"
           >
-            <span className="font-semibold text-blue-400">
+            <span className="font-semibold text-sky-400">
               {
                 (() => {
                   const replyToSenderId = message.replyTo.senderId?._id || message.replyTo.senderId;
@@ -421,52 +421,52 @@ const Message = ({ message }) => {
                 })()
               }
             </span>
-            <span className="truncate max-w-[200px]">
+            <span className="truncate max-w-[180px]">
               {message.replyTo.image ? "📷 Photo" : message.replyTo.video ? "🎥 Video" : message.replyTo.file ? "📎 File" : message.replyTo.message}
             </span>
           </div>
         )}
         {message.image && (
-          <div className="relative cursor-pointer max-w-[240px] overflow-hidden rounded-lg group">
+          <div className="relative cursor-pointer max-w-[240px] overflow-hidden rounded-xl group border border-white/5">
             <img
               src={message.image}
               alt="Shared content"
-              className="max-h-48 object-cover rounded-lg group-hover:scale-[1.03] transition-transform duration-200"
+              className="max-h-48 w-full object-cover rounded-xl group-hover:scale-[1.03] transition-transform duration-200"
               onClick={() => setShowLightbox(true)}
             />
           </div>
         )}
         {message.file && (
-          <div className="flex items-center gap-3 p-3 bg-gray-800 border border-gray-700 rounded-lg min-w-[200px] max-w-[280px]">
-            <div className="text-blue-400 text-2xl flex-shrink-0">
+          <div className="flex items-center gap-3 p-2.5 bg-slate-950/30 border border-white/5 rounded-2xl min-w-[200px] max-w-[280px]">
+            <div className="text-sky-400 text-xl flex-shrink-0 bg-slate-800/80 p-2 rounded-xl">
               {getFileIcon(message.fileName)}
             </div>
-            <div className="flex flex-col min-w-0 flex-1">
-              <span className="text-sm font-semibold text-white truncate" title={message.fileName}>
+            <div className="flex flex-col min-w-0 flex-grow pr-1">
+              <span className="text-xs font-semibold text-white truncate" title={message.fileName}>
                 {highlightText(message.fileName, searchQuery)}
               </span>
-              <span className="text-xs text-gray-400">
+              <span className="text-[10px] text-gray-400">
                 {formatBytes(message.fileSize)}
               </span>
             </div>
             <button
               onClick={() => downloadFile(message.file, message.fileName)}
-              className="p-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-lg transition-all flex-shrink-0"
+              className="w-8 h-8 bg-sky-500 hover:bg-sky-600 active:scale-95 text-white rounded-xl transition-all flex flex-shrink-0 items-center justify-center border-none"
               title="Download file"
             >
-              <BsDownload size={16} />
+              <BsDownload size={13} />
             </button>
           </div>
         )}
         {message.video && (
           <div className="flex flex-col gap-1.5 max-w-[280px]">
-            <div className="relative rounded-lg overflow-hidden border border-gray-700 bg-black/60 shadow-inner flex flex-col">
+            <div className="relative rounded-2xl overflow-hidden border border-white/5 bg-slate-950/30 shadow-inner flex flex-col">
               <video
                 src={message.video}
                 controls
-                className="w-full max-h-48 object-contain rounded-t-lg bg-black"
+                className="w-full max-h-48 object-contain rounded-t-2xl bg-black"
               />
-              <div className="flex justify-between items-center gap-2 p-2 bg-gray-800/80 backdrop-blur-sm border-t border-gray-700/50 rounded-b-lg">
+              <div className="flex justify-between items-center gap-2 p-2 bg-slate-900/60 backdrop-blur-sm border-t border-white/5 rounded-b-2xl">
                 <div className="flex flex-col min-w-0 flex-grow pr-1">
                   <span className="text-[11px] font-medium text-white truncate" title={message.videoName}>
                     {message.videoName}
@@ -477,10 +477,10 @@ const Message = ({ message }) => {
                 </div>
                 <button
                   onClick={() => downloadFile(message.video, message.videoName)}
-                  className="p-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded transition-all flex-shrink-0"
+                  className="w-7 h-7 bg-sky-500 hover:bg-sky-600 active:scale-95 text-white rounded-lg transition-all flex flex-shrink-0 items-center justify-center border-none"
                   title="Download video"
                 >
-                  <BsDownload size={12} />
+                  <BsDownload size={11} />
                 </button>
               </div>
             </div>
@@ -515,15 +515,15 @@ const Message = ({ message }) => {
                   e.stopPropagation();
                   handleReactionClick(emoji, userNames);
                 }}
-                className={`group/react relative flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs cursor-pointer select-none transition-all ${hasReacted
-                    ? "bg-blue-600 bg-opacity-30 border border-blue-500 text-white"
-                    : "bg-gray-800 bg-opacity-50 border border-gray-700 text-gray-300 hover:bg-gray-700"
+                className={`group/react relative flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] cursor-pointer select-none transition-native ${hasReacted
+                    ? "bg-sky-500/20 border border-sky-500/30 text-white"
+                    : "bg-slate-800/40 border border-slate-700/30 text-gray-300 hover:bg-slate-700/60"
                   }`}
               >
                 <span>{emoji}</span>
-                <span className="font-semibold">{users.length}</span>
+                <span className="font-bold">{users.length}</span>
 
-                <div className={`absolute bottom-full mb-2 hidden group-hover/react:block bg-gray-900 text-white text-[10px] rounded py-1 px-2 whitespace-nowrap z-[100] shadow-lg border border-gray-700 ${fromMe ? "right-0" : "left-0"}`}>
+                <div className={`absolute bottom-full mb-1.5 hidden group-hover/react:block bg-slate-950 text-white text-[9px] rounded-lg py-1 px-2.5 whitespace-nowrap z-[100] shadow-2xl border border-slate-800 ${fromMe ? "right-0" : "left-0"}`}>
                   {userNames}
                 </div>
               </div>

@@ -1,36 +1,29 @@
 const GenderCheckbox = ({ onCheckboxChange, selectedGender }) => {
   return (
-    <div className="flex">
-      <div className="form-control">
-        <label
-          className={`label gap-2 cursor-pointer ${
-            selectedGender === "male" ? "selected" : ""
-          }`}
-        >
-          <span className="label-text">Male</span>
-          <input
-            type="checkbox"
-            className="checkbox border-slate-900"
-            checked={selectedGender === "male"}
-            onChange={() => onCheckboxChange("male")}
-          />
-        </label>
-      </div>
-      <div className="form-control">
-        <label
-          className={`label gap-2 cursor-pointer ${
-            selectedGender === "female" ? "selected" : ""
-          }`}
-        >
-          <span className="label-text">Female</span>
-          <input
-            type="checkbox"
-            className="checkbox border-slate-900"
-            checked={selectedGender === "female"}
-            onChange={() => onCheckboxChange("female")}
-          />
-        </label>
-      </div>
+    <div className="flex items-center gap-3 select-none">
+      <span className="text-[10px] font-bold text-gray-450 tracking-wider uppercase mr-1">Gender:</span>
+      <button
+        type="button"
+        onClick={() => onCheckboxChange("male")}
+        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-native ${
+          selectedGender === "male"
+            ? "bg-sky-500/20 border-sky-500 text-sky-400 shadow-md"
+            : "bg-slate-950/40 border-slate-800 text-gray-400 hover:text-white hover:bg-slate-850"
+        }`}
+      >
+        Male
+      </button>
+      <button
+        type="button"
+        onClick={() => onCheckboxChange("female")}
+        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-native ${
+          selectedGender === "female"
+            ? "bg-sky-500/20 border-sky-500 text-sky-400 shadow-md"
+            : "bg-slate-950/40 border-slate-800 text-gray-400 hover:text-white hover:bg-slate-850"
+        }`}
+      >
+        Female
+      </button>
     </div>
   );
 };
