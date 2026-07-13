@@ -6,7 +6,7 @@ import { sanitizeUserProfile } from "./user.controller.js";
 
 export const sendMessage = async (req, res) => {
   try {
-    const { message, image, file, fileName, fileSize, replyTo, video, videoName, videoSize } = req.body;
+    const { message, image, file, fileName, fileSize, replyTo, video, videoName, videoSize, audio, audioName, audioSize, audioDuration } = req.body;
     const { id: receiverId } = req.params; // receiverId can be user ID or group Conversation ID
     const senderId = req.user._id;
 
@@ -24,6 +24,23 @@ export const sendMessage = async (req, res) => {
 
       if (videoSize > 100 * 1024 * 1024) {
         return res.status(400).json({ error: "Video size must be less than 100 MB" });
+      }
+    }
+
+    // Validation for audio if present
+    if (audio) {
+      if (!audioName || !audioSize) {
+        return res.status(400).json({ error: "Audio name and size are required for audio attachment" });
+      }
+
+      const allowedExtensions = ["webm", "ogg", "mp3", "m4a", "wav", "mp4"];
+      const extension = audioName.split('.').pop().toLowerCase();
+      if (!allowedExtensions.includes(extension)) {
+        return res.status(400).json({ error: "Unsupported audio type. Allowed: WEBM, OGG, MP3, M4A, WAV" });
+      }
+
+      if (audioSize > 15 * 1024 * 1024) {
+        return res.status(400).json({ error: "Audio size must be less than 15 MB" });
       }
     }
 
@@ -91,6 +108,10 @@ export const sendMessage = async (req, res) => {
       video: video || null,
       videoName: videoName || null,
       videoSize: videoSize || null,
+      audio: audio || null,
+      audioName: audioName || null,
+      audioSize: audioSize || null,
+      audioDuration: audioDuration || null,
       replyTo: replyTo || null,
       status: isGroupChat ? "sent" : (receiverSocketId ? "delivered" : "sent"),
     });
@@ -110,7 +131,7 @@ export const sendMessage = async (req, res) => {
     if (newMessage.replyTo) {
       await newMessage.populate({
         path: "replyTo",
-        select: "message image file fileName fileSize video videoName videoSize senderId",
+        select: "message image file fileName fileSize video videoName videoSize audio audioName audioSize audioDuration senderId",
         populate: {
           path: "senderId",
           select: "username fullName"
@@ -163,7 +184,7 @@ export const getMessages = async (req, res) => {
         },
         {
           path: "replyTo",
-          select: "message image file fileName fileSize senderId",
+          select: "message image file fileName fileSize video videoName videoSize audio audioName audioSize audioDuration senderId",
           populate: {
             path: "senderId",
             select: "username fullName"
@@ -191,7 +212,7 @@ export const getMessages = async (req, res) => {
           },
           {
             path: "replyTo",
-            select: "message image file fileName fileSize senderId",
+            select: "message image file fileName fileSize video videoName videoSize audio audioName audioSize audioDuration senderId",
             populate: {
               path: "senderId",
               select: "username fullName"
@@ -331,6 +352,13 @@ export const deleteMessage = async (req, res) => {
       msg.file = null;
       msg.fileName = null;
       msg.fileSize = null;
+      msg.video = null;
+      msg.videoName = null;
+      msg.videoSize = null;
+      msg.audio = null;
+      msg.audioName = null;
+      msg.audioSize = null;
+      msg.audioDuration = null;
       msg.isDeletedForEveryone = true;
       msg.reactions = [];
       await msg.save();
@@ -343,7 +371,7 @@ export const deleteMessage = async (req, res) => {
       if (msg.replyTo) {
         await msg.populate({
           path: "replyTo",
-          select: "message image file fileName fileSize senderId",
+          select: "message image file fileName fileSize video videoName videoSize audio audioName audioSize audioDuration senderId",
           populate: {
             path: "senderId",
             select: "username fullName"
@@ -630,6 +658,13 @@ export const forwardMessage = async (req, res) => {
         file: sourceMessage.file || null,
         fileName: sourceMessage.fileName || null,
         fileSize: sourceMessage.fileSize || null,
+        video: sourceMessage.video || null,
+        videoName: sourceMessage.videoName || null,
+        videoSize: sourceMessage.videoSize || null,
+        audio: sourceMessage.audio || null,
+        audioName: sourceMessage.audioName || null,
+        audioSize: sourceMessage.audioSize || null,
+        audioDuration: sourceMessage.audioDuration || null,
         replyTo: sourceMessage.replyTo || null,
         isForwarded: true,
         status: isGroupChat ? "sent" : (receiverSocketId ? "delivered" : "sent"),
@@ -646,7 +681,7 @@ export const forwardMessage = async (req, res) => {
       if (newMsg.replyTo) {
         await newMsg.populate({
           path: "replyTo",
-          select: "message image file fileName fileSize senderId",
+          select: "message image file fileName fileSize video videoName videoSize audio audioName audioSize audioDuration senderId",
           populate: {
             path: "senderId",
             select: "username fullName"

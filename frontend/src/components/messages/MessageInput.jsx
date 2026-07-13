@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { BsSend, BsEmojiSmile, BsImage, BsPaperclip, BsFileEarmarkPdf, BsFileEarmarkWord, BsFileEarmarkText, BsFileEarmarkZip, BsFileEarmark, BsPlayBtn, BsPlusLg } from "react-icons/bs";
+import { BsSend, BsEmojiSmile, BsImage, BsPaperclip, BsFileEarmarkPdf, BsFileEarmarkWord, BsFileEarmarkText, BsFileEarmarkZip, BsFileEarmark, BsPlayBtn, BsPlusLg, BsMic, BsMicFill, BsPlayFill, BsPauseFill } from "react-icons/bs";
 import useSendMessage from "../../hooks/useSendMessage";
 import useConversation from "../../zustand/useConversation";
 import { useSocketContext } from "../../context/SocketContext";
@@ -66,6 +66,18 @@ const MessageInput = () => {
   const [selectedVideo, setSelectedVideo] = useState(null); // { video: base64, name, size }
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
 
+  // Voice recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [recordedAudio, setRecordedAudio] = useState(null);
+  const [audioBlobData, setAudioBlobData] = useState(null);
+  const [loadingVoice, setLoadingVoice] = useState(false);
+
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recordingTimerRef = useRef(null);
+  const isCancelledRef = useRef(false);
+
   const getReplyingSnippet = (msg) => {
     if (!msg) return "";
     if (msg.image) return "📷 Photo";
@@ -103,6 +115,21 @@ const MessageInput = () => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        try {
+          mediaRecorderRef.current.stop();
+        } catch (e) {
+          // ignore
+        }
+      }
     };
   }, []);
 
@@ -560,6 +587,119 @@ const MessageInput = () => {
     }, 0);
   };
 
+  const startRecording = async () => {
+    if (isRecording) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" });
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        if (isCancelledRef.current) {
+          isCancelledRef.current = false;
+          // Stop stream tracks
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm;codecs=opus" });
+        const audioUrl = URL.createObjectURL(audioBlob);
+        setRecordedAudio(audioUrl);
+        setAudioBlobData(audioBlob);
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+
+      // Start timer
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingTime((prev) => {
+          if (prev >= 300) { // 5 minutes max
+            stopRecording();
+            return prev;
+          }
+          return prev + 1;
+        });
+      }, 1000);
+
+    } catch (err) {
+      console.error("Recording start error:", err);
+      toast.error("Microphone permission denied or recording failed");
+    }
+  };
+
+  const stopRecording = () => {
+    if (!mediaRecorderRef.current || mediaRecorderRef.current.state === "inactive") return;
+    clearInterval(recordingTimerRef.current);
+    mediaRecorderRef.current.stop();
+    setIsRecording(false);
+  };
+
+  const cancelRecording = () => {
+    isCancelledRef.current = true;
+    clearInterval(recordingTimerRef.current);
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+    setRecordedAudio(null);
+    setAudioBlobData(null);
+    toast.success("Recording discarded");
+  };
+
+  const handleSendVoice = async () => {
+    if (!audioBlobData) return;
+    if (recordingTime < 1) {
+      toast.error("Recording must be at least 1 second");
+      return;
+    }
+
+    setLoadingVoice(true);
+    try {
+      const reader = new FileReader();
+      reader.readAsDataURL(audioBlobData);
+      reader.onloadend = async () => {
+        const base64Audio = reader.result;
+
+        await sendMessage(
+          "", // message text
+          null, // image
+          null, // file
+          replyingTo?._id, // replyTo
+          null, // video
+          {
+            audio: base64Audio,
+            audioName: `voice_${Date.now()}.webm`,
+            audioSize: audioBlobData.size,
+            audioDuration: recordingTime
+          }
+        );
+
+        setRecordedAudio(null);
+        setAudioBlobData(null);
+        setReplyingTo(null);
+      };
+    } catch (err) {
+      toast.error("Upload failed");
+    } finally {
+      setLoadingVoice(false);
+    }
+  };
+
+  const formatRecordingTime = (timeInSeconds) => {
+    const minutes = Math.floor(timeInSeconds / 60);
+    const seconds = timeInSeconds % 60;
+    return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
+  };
+
   return (
     <form className="px-4 pb-4 pt-2 sticky bottom-0 z-20 bg-transparent flex flex-col gap-2" onSubmit={handleSubmit}>
       {editingMessage && (
@@ -717,155 +857,291 @@ const MessageInput = () => {
         </div>
       )}
 
-      <div className="w-full flex items-center gap-2">
-        {/* Actions Row */}
-        <div className="flex items-center gap-0.5 bg-slate-800/40 border border-white/5 rounded-full px-2 py-1 shadow-inner relative">
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            accept="image/jpeg, image/jpg, image/png, image/gif, image/webp"
-            className="hidden"
-          />
-          <input
-            type="file"
-            ref={fileAttachmentRef}
-            onChange={handleAttachmentChange}
-            accept=".pdf,.doc,.docx,.txt,.zip"
-            className="hidden"
-          />
-          <input
-            type="file"
-            ref={videoInputRef}
-            onChange={handleVideoChange}
-            accept="video/mp4,video/webm,video/quicktime"
-            className="hidden"
-          />
-
-          {/* Combined Attachment Trigger Button */}
-          <button
-            type="button"
-            ref={attachmentButtonRef}
-            onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
-            className={`w-8 h-8 flex items-center justify-center rounded-full transition-native ${
-              showAttachmentMenu ? "text-sky-400 bg-sky-500/10" : "text-gray-400 hover:text-white hover:bg-white/5"
-            }`}
-            title="Attach media or files"
-            aria-label="Attach File"
-          >
-            <BsPaperclip size={16} className={`transition-transform duration-200 ${showAttachmentMenu ? "rotate-[-30deg] text-sky-450" : ""}`} />
-          </button>
-
-          {/* Emoji Toggle Button */}
-          <button
-            type="button"
-            ref={emojiButtonRef}
-            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/5 rounded-full transition-native"
-            title="Choose emoji"
-          >
-            <BsEmojiSmile size={16} />
-          </button>
-
-          {showAttachmentMenu && (
-            <div
-              ref={attachmentMenuRef}
-              className="absolute bottom-14 left-0 z-50 w-36 bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl p-1 flex flex-col gap-0.5 animate-fadeIn"
+      {isRecording ? (
+        /* Recording Screen */
+        <div className="w-full flex items-center justify-between bg-slate-900/90 border border-white/5 rounded-full px-4 py-2 animate-pulse transition-all">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
+            <span className="text-xs font-semibold text-gray-300">Recording</span>
+            <span className="text-xs font-bold text-white ml-1">{formatRecordingTime(recordingTime)}</span>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <button
+              type="button"
+              onClick={cancelRecording}
+              className="text-[11px] font-bold text-red-400 hover:text-red-300 transition-colors cursor-pointer px-2 h-8 min-w-[44px]"
+              aria-label="Cancel recording"
             >
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAttachmentMenu(false);
-                  fileInputRef.current?.click();
-                }}
-                className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-gray-300 hover:text-white hover:bg-slate-800 rounded-xl transition-native select-none w-full text-left font-bold"
-              >
-                <span>🖼️</span>
-                <span>Image</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAttachmentMenu(false);
-                  videoInputRef.current?.click();
-                }}
-                className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-gray-300 hover:text-white hover:bg-slate-800 rounded-xl transition-native select-none w-full text-left font-bold"
-              >
-                <span>🎥</span>
-                <span>Video</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAttachmentMenu(false);
-                  fileAttachmentRef.current?.click();
-                }}
-                className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-gray-300 hover:text-white hover:bg-slate-800 rounded-xl transition-native select-none w-full text-left font-bold"
-              >
-                <span>📄</span>
-                <span>Document</span>
-              </button>
-            </div>
-          )}
-
-          {showEmojiPicker && (
-            <div
-              ref={emojiPickerRef}
-              className="absolute bottom-14 left-10 z-50 w-72 h-64 bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl p-3 flex flex-col gap-2 animate-fadeIn"
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={stopRecording}
+              className="px-4 py-1.5 bg-sky-500 hover:bg-sky-600 active:scale-95 text-white text-[11px] font-bold rounded-xl transition-all h-8 min-w-[44px] border-none cursor-pointer"
+              aria-label="Stop recording"
             >
-              <div className="text-[10px] font-bold text-gray-400 border-b border-slate-750 pb-1.5 mb-1 tracking-wider uppercase">
-                Emojis
-              </div>
-              <div className="grid grid-cols-8 gap-1.5 overflow-y-auto pr-1 select-none no-scrollbar">
-                {EMOJIS.map((emoji, index) => (
-                  <button
-                    key={index}
-                    type="button"
-                    onClick={() => handleEmojiSelect(emoji)}
-                    className="text-xl p-1 rounded-lg hover:bg-slate-800 active:scale-90 transition-all flex items-center justify-center"
-                  >
-                    {emoji}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+              Stop
+            </button>
+          </div>
         </div>
-
-        {/* Input Pill Container */}
-        <div className="relative flex-grow flex items-center">
-          <input
-            type="text"
-            ref={inputRef}
-            className="w-full text-xs rounded-full py-2.5 pl-4 pr-4 bg-slate-800/80 border border-slate-700/50 text-white placeholder-gray-400 focus:border-sky-500 focus:outline-none transition-native shadow-inner"
-            placeholder={editingMessage ? "Edit message..." : "Type a message..."}
-            value={message}
-            onChange={handleInputChange}
-            onClick={saveCursorPosition}
-            onKeyUp={saveCursorPosition}
-            onBlur={saveCursorPosition}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                setEditingMessage(null);
-              }
-            }}
-          />
+      ) : recordedAudio ? (
+        /* Playable Preview Screen */
+        <div className="w-full flex items-center justify-between bg-slate-900/90 border border-white/5 rounded-full px-4 py-1.5 transition-all">
+          <div className="flex items-center gap-2.5 flex-grow mr-4">
+            <VoicePreviewPlayer src={recordedAudio} duration={recordingTime} />
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setRecordedAudio(null);
+                setAudioBlobData(null);
+              }}
+              className="text-[11px] font-bold text-red-400 hover:text-red-300 transition-colors cursor-pointer px-2 h-8 min-w-[44px]"
+              aria-label="Discard recording"
+            >
+              Discard
+            </button>
+            <button
+              type="button"
+              disabled={loadingVoice || loading}
+              onClick={handleSendVoice}
+              className="w-9 h-9 rounded-full bg-sky-500 hover:bg-sky-600 active:scale-95 text-white flex items-center justify-center transition-native shadow-lg shadow-sky-500/10 border-none shrink-0 cursor-pointer"
+              aria-label="Send voice message"
+            >
+              {loadingVoice || loading ? (
+                <div className="loading loading-spinner loading-xs"></div>
+              ) : (
+                <BsSend className="w-3.5 h-3.5 ml-0.5" />
+              )}
+            </button>
+          </div>
         </div>
+      ) : (
+        /* Standard Input Bar Screen */
+        <div className="w-full flex items-center gap-2">
+          {/* Actions Row */}
+          <div className="flex items-center gap-0.5 bg-slate-800/40 border border-white/5 rounded-full px-2 py-1 shadow-inner relative">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept="image/jpeg, image/jpg, image/png, image/gif, image/webp"
+              className="hidden"
+            />
+            <input
+              type="file"
+              ref={fileAttachmentRef}
+              onChange={handleAttachmentChange}
+              accept=".pdf,.doc,.docx,.txt,.zip"
+              className="hidden"
+            />
+            <input
+              type="file"
+              ref={videoInputRef}
+              onChange={handleVideoChange}
+              accept="video/mp4,video/webm,video/quicktime"
+              className="hidden"
+            />
 
-        {/* Circular Floating Send Action */}
-        <button
-          type="submit"
-          className="flex-shrink-0 w-9 h-9 rounded-full bg-sky-500 hover:bg-sky-600 active:scale-95 text-white flex items-center justify-center transition-native shadow-lg shadow-sky-500/10 border-none"
-        >
-          {loading ? (
-            <div className="loading loading-spinner loading-xs"></div>
+            {/* Combined Attachment Trigger Button */}
+            <button
+              type="button"
+              ref={attachmentButtonRef}
+              onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
+              className={`w-8 h-8 flex items-center justify-center rounded-full transition-native ${
+                showAttachmentMenu ? "text-sky-400 bg-sky-500/10" : "text-gray-400 hover:text-white hover:bg-white/5"
+              }`}
+              title="Attach media or files"
+              aria-label="Attach File"
+            >
+              <BsPaperclip size={16} className={`transition-transform duration-200 ${showAttachmentMenu ? "rotate-[-30deg] text-sky-450" : ""}`} />
+            </button>
+
+            {/* Emoji Toggle Button */}
+            <button
+              type="button"
+              ref={emojiButtonRef}
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/5 rounded-full transition-native"
+              title="Choose emoji"
+            >
+              <BsEmojiSmile size={16} />
+            </button>
+
+            {showAttachmentMenu && (
+              <div
+                ref={attachmentMenuRef}
+                className="absolute bottom-14 left-0 z-50 w-36 bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl p-1 flex flex-col gap-0.5 animate-fadeIn"
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAttachmentMenu(false);
+                    fileInputRef.current?.click();
+                  }}
+                  className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-gray-300 hover:text-white hover:bg-slate-800 rounded-xl transition-native select-none w-full text-left font-bold"
+                >
+                  <span>🖼️</span>
+                  <span>Image</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAttachmentMenu(false);
+                    videoInputRef.current?.click();
+                  }}
+                  className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-gray-300 hover:text-white hover:bg-slate-800 rounded-xl transition-native select-none w-full text-left font-bold"
+                >
+                  <span>🎥</span>
+                  <span>Video</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAttachmentMenu(false);
+                    fileAttachmentRef.current?.click();
+                  }}
+                  className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-gray-300 hover:text-white hover:bg-slate-800 rounded-xl transition-native select-none w-full text-left font-bold"
+                >
+                  <span>📄</span>
+                  <span>Document</span>
+                </button>
+              </div>
+            )}
+
+            {showEmojiPicker && (
+              <div
+                ref={emojiPickerRef}
+                className="absolute bottom-14 left-10 z-50 w-72 h-64 bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl p-3 flex flex-col gap-2 animate-fadeIn"
+              >
+                <div className="text-[10px] font-bold text-gray-400 border-b border-slate-750 pb-1.5 mb-1 tracking-wider uppercase">
+                  Emojis
+                </div>
+                <div className="grid grid-cols-8 gap-1.5 overflow-y-auto pr-1 select-none no-scrollbar">
+                  {EMOJIS.map((emoji, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => handleEmojiSelect(emoji)}
+                      className="text-xl p-1 rounded-lg hover:bg-slate-800 active:scale-90 transition-all flex items-center justify-center"
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Input Pill Container */}
+          <div className="relative flex-grow flex items-center">
+            <input
+              type="text"
+              ref={inputRef}
+              className="w-full text-xs rounded-full py-2.5 pl-4 pr-4 bg-slate-800/80 border border-slate-700/50 text-white placeholder-gray-400 focus:border-sky-500 focus:outline-none transition-native shadow-inner"
+              placeholder={editingMessage ? "Edit message..." : "Type a message..."}
+              value={message}
+              onChange={handleInputChange}
+              onClick={saveCursorPosition}
+              onKeyUp={saveCursorPosition}
+              onBlur={saveCursorPosition}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setEditingMessage(null);
+                }
+              }}
+            />
+          </div>
+
+          {/* Action Trigger Button: Mic when input is empty, Send when has content */}
+          {!message.trim() && !selectedImage && !selectedFile && !selectedVideo ? (
+            <button
+              type="button"
+              onClick={startRecording}
+              className="flex-shrink-0 w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-750 active:scale-95 text-gray-300 hover:text-white flex items-center justify-center transition-native border-none cursor-pointer"
+              title="Record Voice Message"
+              aria-label="Start recording"
+            >
+              <BsMic size={16} />
+            </button>
           ) : (
-            <BsSend className="w-3.5 h-3.5 ml-0.5" />
+            <button
+              type="submit"
+              className="flex-shrink-0 w-9 h-9 rounded-full bg-sky-500 hover:bg-sky-600 active:scale-95 text-white flex items-center justify-center transition-native shadow-lg shadow-sky-500/10 border-none cursor-pointer"
+              aria-label="Send message"
+            >
+              {loading ? (
+                <div className="loading loading-spinner loading-xs"></div>
+              ) : (
+                <BsSend className="w-3.5 h-3.5 ml-0.5" />
+              )}
+            </button>
           )}
-        </button>
-      </div>
+        </div>
+      )}
     </form>
   );
 };
+
+/* Voice Preview Audio Player Component */
+const VoicePreviewPlayer = ({ src, duration }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const audioRef = useRef(null);
+
+  const togglePlay = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (isPlaying) {
+      audio.pause();
+      setIsPlaying(false);
+    } else {
+      audio.play().catch((err) => console.log("Audio preview play failed:", err));
+      setIsPlaying(true);
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    setCurrentTime(audio.currentTime);
+  };
+
+  const handleEnded = () => {
+    setIsPlaying(false);
+    setCurrentTime(0);
+  };
+
+  const formatTime = (timeInSeconds) => {
+    if (isNaN(timeInSeconds)) return "0:00";
+    const minutes = Math.floor(timeInSeconds / 60);
+    const seconds = Math.floor(timeInSeconds % 60);
+    return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
+  };
+
+  return (
+    <div className="flex items-center gap-2.5 w-full select-none">
+      <audio
+        ref={audioRef}
+        src={src}
+        onTimeUpdate={handleTimeUpdate}
+        onEnded={handleEnded}
+      />
+      <button
+        type="button"
+        onClick={togglePlay}
+        className="w-8 h-8 rounded-full bg-slate-800 text-sky-400 flex items-center justify-center hover:scale-105 active:scale-95 transition-all border-none cursor-pointer shrink-0"
+        aria-label={isPlaying ? "Pause voice message" : "Play voice message"}
+      >
+        {isPlaying ? <BsPauseFill size={16} /> : <BsPlayFill size={16} />}
+      </button>
+      <span className="text-[10px] font-bold text-gray-400 tracking-wider">
+        Preview: {formatTime(currentTime)} / {formatTime(duration)}
+      </span>
+    </div>
+  );
+};
+
 export default MessageInput;
 

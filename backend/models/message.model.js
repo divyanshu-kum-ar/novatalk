@@ -35,6 +35,18 @@ const messageSchema = new mongoose.Schema(
     videoSize: {
       type: Number,
     },
+    audio: {
+      type: String,
+    },
+    audioName: {
+      type: String,
+    },
+    audioSize: {
+      type: Number,
+    },
+    audioDuration: {
+      type: Number,
+    },
     edited: {
       type: Boolean,
       default: false,

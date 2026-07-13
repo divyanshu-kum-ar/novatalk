@@ -1,8 +1,8 @@
 import { useAuthContext } from "../../context/AuthContext";
 import { extractTime } from "../../utils/extractTime";
 import useConversation from "../../zustand/useConversation";
-import { useState } from "react";
-import { BsDownload, BsFileEarmarkPdf, BsFileEarmarkWord, BsFileEarmarkText, BsFileEarmarkZip, BsFileEarmark, BsThreeDotsVertical, BsTelephoneInboundFill, BsTelephoneOutboundFill, BsTelephoneXFill, BsCameraVideoFill } from "react-icons/bs";
+import { useState, useEffect, useRef } from "react";
+import { BsDownload, BsFileEarmarkPdf, BsFileEarmarkWord, BsFileEarmarkText, BsFileEarmarkZip, BsFileEarmark, BsThreeDotsVertical, BsTelephoneInboundFill, BsTelephoneOutboundFill, BsTelephoneXFill, BsCameraVideoFill, BsPlayFill, BsPauseFill } from "react-icons/bs";
 import toast from "react-hot-toast";
 import LinkPreview from "./LinkPreview";
 
@@ -52,6 +52,179 @@ const getDefaultAvatar = (gender) => {
   if (gender === "male") return DEFAULT_AVATAR_MALE;
   if (gender === "female") return DEFAULT_AVATAR_FEMALE;
   return DEFAULT_AVATAR_GENERIC;
+};
+
+/* Custom seekable Voice Message Player component */
+const VoiceMessagePlayer = ({ src, duration, messageId, fromMe, formattedTime, statusIcon }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [totalDuration, setTotalDuration] = useState(duration || 0);
+  const audioRef = useRef(null);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const handlePlayEvent = (e) => {
+      if (e.detail.messageId !== messageId) {
+        audio.pause();
+        setIsPlaying(false);
+      }
+    };
+
+    window.addEventListener("novatalk_audio_play", handlePlayEvent);
+
+    return () => {
+      window.removeEventListener("novatalk_audio_play", handlePlayEvent);
+      audio.pause();
+    };
+  }, [messageId]);
+
+  const togglePlay = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (isPlaying) {
+      audio.pause();
+      setIsPlaying(false);
+    } else {
+      // Dispatch play event to pause others
+      window.dispatchEvent(
+        new CustomEvent("novatalk_audio_play", { detail: { messageId } })
+      );
+      audio.play().catch((err) => console.log("Audio play failed:", err));
+      setIsPlaying(true);
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    setCurrentTime(audio.currentTime);
+  };
+
+  const handleLoadedMetadata = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audio.duration && !isNaN(audio.duration) && audio.duration !== Infinity) {
+      setTotalDuration(audio.duration);
+    }
+  };
+
+  const handleEnded = () => {
+    setIsPlaying(false);
+    setCurrentTime(0);
+  };
+
+  const handleSeek = (e) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const newTime = parseFloat(e.target.value);
+    audio.currentTime = newTime;
+    setCurrentTime(newTime);
+  };
+
+  const handleWaveformClick = (e) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const width = rect.width;
+    const percent = Math.max(0, Math.min(1, clickX / width));
+    const newTime = percent * totalDuration;
+    audio.currentTime = newTime;
+    setCurrentTime(newTime);
+  };
+
+  const formatTime = (timeInSeconds) => {
+    if (isNaN(timeInSeconds)) return "0:00";
+    const minutes = Math.floor(timeInSeconds / 60);
+    const seconds = Math.floor(timeInSeconds % 60);
+    return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
+  };
+
+  return (
+    <div className="flex flex-col w-full relative">
+      <audio
+        ref={audioRef}
+        src={src}
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={handleLoadedMetadata}
+        onEnded={handleEnded}
+        preload="metadata"
+      />
+      {/* Upper Row: Play button + Waveform Area */}
+      <div className="flex items-center gap-3 w-full">
+        {/* Play/Pause Button */}
+        <button
+          type="button"
+          onClick={togglePlay}
+          className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-150 active:scale-95 border-none cursor-pointer shrink-0 shadow-md ${
+            fromMe
+              ? "bg-white text-sky-600 hover:bg-slate-50"
+              : "bg-sky-500 text-white hover:bg-sky-600"
+          }`}
+          aria-label={isPlaying ? "Pause voice message" : "Play voice message"}
+        >
+          {isPlaying ? (
+            <BsPauseFill size={22} className={fromMe ? "text-sky-600" : "text-white"} />
+          ) : (
+            <BsPlayFill size={22} className={`ml-0.5 ${fromMe ? "text-sky-600" : "text-white"}`} />
+          )}
+        </button>
+
+        {/* Waveform / Progress Area */}
+        <div className="flex-grow flex flex-col justify-center min-w-0 relative">
+          <div 
+            className="h-6 flex items-center gap-[3px] w-full cursor-pointer select-none relative" 
+            onClick={handleWaveformClick}
+            title="Seek playback position"
+          >
+            {Array.from({ length: 24 }).map((_, i) => {
+              // Deterministic bar height sequence to render a premium dynamic wave
+              const heights = [6, 12, 16, 10, 6, 8, 14, 18, 10, 8, 12, 14, 8, 6, 10, 14, 18, 12, 6, 8, 14, 10, 8, 6];
+              const height = heights[i % heights.length];
+              
+              const barPercent = (i / 24) * 100;
+              const currentPercent = (currentTime / (totalDuration || 1)) * 100;
+              const isPlayed = barPercent <= currentPercent;
+
+              return (
+                <span
+                  key={i}
+                  className={`w-[3px] rounded-full transition-colors duration-150 flex-shrink-0 ${
+                    isPlayed
+                      ? (fromMe ? "bg-white" : "bg-sky-400")
+                      : (fromMe ? "bg-white/30" : "bg-slate-600")
+                  }`}
+                  style={{ height: `${height}px` }}
+                />
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Spacing & Metadata Row: time indicators and timestamp placement inside the bubble */}
+      <div className="flex justify-between items-center w-full pl-[52px] text-[10px] font-bold text-gray-400/90 mt-1.5 select-none pr-1">
+        <div className="flex items-center gap-3">
+          <span className={fromMe ? "text-sky-100/90" : "text-gray-400"}>
+            {formatTime(currentTime)}
+          </span>
+          <span className="opacity-40">/</span>
+          <span className={fromMe ? "text-sky-100/90" : "text-gray-400"}>
+            {formatTime(totalDuration)}
+          </span>
+        </div>
+
+        {/* Timestamp inside the bubble */}
+        <div className="flex items-center gap-1 text-[9px] font-bold opacity-75 self-end translate-y-1">
+          <span className={fromMe ? "text-sky-100/90" : "text-gray-405"}>{formattedTime}</span>
+          {statusIcon}
+        </div>
+      </div>
+    </div>
+  );
 };
 
 const Message = ({ message }) => {
@@ -300,7 +473,15 @@ const Message = ({ message }) => {
   const profilePic = fromMe
     ? authUser.profilePic
     : (typeof message.senderId === "object" && message.senderId !== null ? message.senderId.profilePic : selectedConversation?.profilePic);
-  const bubbleBgColor = fromMe ? "bg-sky-500 text-white rounded-2xl rounded-tr-none shadow-md" : "bg-slate-800 text-slate-100 rounded-2xl rounded-tl-none border border-white/5 shadow-md";
+  const bubbleBgColor = message.audio
+    ? (fromMe
+        ? "bg-gradient-to-br from-sky-600 to-sky-700 text-white rounded-2xl rounded-tr-none shadow-md border border-sky-500/20"
+        : "bg-slate-850 text-slate-100 rounded-2xl rounded-tl-none border border-white/5 shadow-md"
+      )
+    : (fromMe
+        ? "bg-sky-500 text-white rounded-2xl rounded-tr-none shadow-md"
+        : "bg-slate-800 text-slate-100 rounded-2xl rounded-tl-none border border-white/5 shadow-md"
+      );
 
   const shakeClass = message.shouldShake ? "shake" : "";
 
@@ -321,7 +502,7 @@ const Message = ({ message }) => {
 
       return (
         <div id={`msg-${message._id}`} className={`chat ${chatClassName}`}>
-          <div className="chat-image avatar">
+          <div className={`chat-image avatar ${message.audio ? "self-end pb-1" : ""}`}>
             <div className="w-10 rounded-full bg-slate-700 flex items-center justify-center">
               <img
                 alt="Tailwind CSS chat bubble component"
@@ -333,7 +514,11 @@ const Message = ({ message }) => {
             </div>
           </div>
           <div
-            className={`chat-bubble text-white ${shakeClass} ${bubbleBgColor} ${highlightClass} pb-2.5 flex flex-col gap-2 relative group ${fromMe ? "pr-8" : ""} min-w-[90px] transition-all duration-300`}
+            className={`chat-bubble text-white ${shakeClass} ${bubbleBgColor} ${highlightClass} ${
+              message.audio
+                ? "w-[280px] sm:w-[300px] min-h-[78px] max-w-[85vw] sm:max-w-none p-3.5 pb-2 hover:bg-opacity-95"
+                : "pb-2.5 flex flex-col gap-2 " + (fromMe ? "pr-8" : "")
+            } flex flex-col gap-2 relative group min-w-[90px] transition-all duration-300`}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
         onContextMenu={(e) => {
@@ -422,7 +607,7 @@ const Message = ({ message }) => {
               }
             </span>
             <span className="truncate max-w-[180px]">
-              {message.replyTo.image ? "📷 Photo" : message.replyTo.video ? "🎥 Video" : message.replyTo.file ? "📎 File" : message.replyTo.message}
+              {message.replyTo.image ? "📷 Photo" : message.replyTo.video ? "🎥 Video" : message.replyTo.file ? "📎 File" : message.replyTo.audio ? "🎙️ Voice Message" : message.replyTo.message}
             </span>
           </div>
         )}
@@ -486,6 +671,16 @@ const Message = ({ message }) => {
             </div>
           </div>
         )}
+        {message.audio && (
+          <VoiceMessagePlayer
+            src={message.audio}
+            duration={message.audioDuration}
+            messageId={message._id}
+            fromMe={fromMe}
+            formattedTime={formattedTime}
+            statusIcon={fromMe ? getStatusIcon() : null}
+          />
+        )}
         {message.message && (
           <span className={`break-words ${message.isDeletedForEveryone ? "italic opacity-60 font-normal select-none" : ""}`}>
             {message.isDeletedForEveryone ? message.message : renderMessageText(message.message)}
@@ -531,10 +726,12 @@ const Message = ({ message }) => {
           })}
         </div>
       )}
-      <div className="chat-footer opacity-50 text-xs flex gap-1 items-center">
-        {formattedTime}
-        {fromMe && getStatusIcon()}
-      </div>
+      {!message.audio && (
+        <div className="chat-footer opacity-50 text-xs flex gap-1 items-center">
+          {formattedTime}
+          {fromMe && getStatusIcon()}
+        </div>
+      )}
 
       {showLightbox && (
         <div
