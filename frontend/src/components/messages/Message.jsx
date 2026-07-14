@@ -227,7 +227,7 @@ const VoiceMessagePlayer = ({ src, duration, messageId, fromMe, formattedTime, s
   );
 };
 
-const Message = ({ message }) => {
+const Message = ({ message, isLastInGroup = true }) => {
   const { authUser } = useAuthContext();
   const { selectedConversation, messages, setMessages, setEditingMessage, setReplyingTo, searchQuery, setForwardingMessage, highlightedMessageId } = useConversation();
   const [showLightbox, setShowLightbox] = useState(false);
@@ -377,9 +377,9 @@ const Message = ({ message }) => {
 
   if (message.isSystem) {
     return (
-      <div className="flex justify-center my-2.5 w-full select-none animate-fade-in">
-        <div className="px-4 py-1.5 bg-gray-800/40 backdrop-blur-md border border-gray-700/30 rounded-full max-w-[85%] sm:max-w-[70%] shadow-md text-center">
-          <span className="text-xs text-gray-300 font-medium tracking-wide">
+      <div className="flex justify-center my-1.5 w-full select-none animate-fade-in">
+        <div className="px-3.5 py-1 bg-slate-900/35 backdrop-blur-sm border border-white/5 rounded-full shadow-sm max-w-max text-center">
+          <span className="text-[11px] text-gray-400 font-medium tracking-wide">
             {message.message}
           </span>
         </div>
@@ -473,14 +473,19 @@ const Message = ({ message }) => {
   const profilePic = fromMe
     ? authUser.profilePic
     : (typeof message.senderId === "object" && message.senderId !== null ? message.senderId.profilePic : selectedConversation?.profilePic);
+
+  const bubbleBorderRadius = fromMe
+    ? (isLastInGroup ? "rounded-2xl rounded-tr-none" : "rounded-2xl")
+    : (isLastInGroup ? "rounded-2xl rounded-tl-none" : "rounded-2xl");
+
   const bubbleBgColor = message.audio
     ? (fromMe
-        ? "bg-gradient-to-br from-sky-600 to-sky-700 text-white rounded-2xl rounded-tr-none shadow-md border border-sky-500/20"
-        : "bg-slate-850 text-slate-100 rounded-2xl rounded-tl-none border border-white/5 shadow-md"
+        ? `bg-gradient-to-br from-sky-500 to-sky-600 text-white border border-sky-400/20 shadow-md ${bubbleBorderRadius}`
+        : `bg-slate-850 text-slate-100 border border-white/5 shadow-md ${bubbleBorderRadius}`
       )
     : (fromMe
-        ? "bg-sky-500 text-white rounded-2xl rounded-tr-none shadow-md"
-        : "bg-slate-800 text-slate-100 rounded-2xl rounded-tl-none border border-white/5 shadow-md"
+        ? `bg-gradient-to-br from-sky-500/90 to-sky-600/90 text-white shadow-md border border-sky-400/10 ${bubbleBorderRadius}`
+        : `bg-slate-800/90 text-slate-100 border border-white/5 shadow-md ${bubbleBorderRadius}`
       );
 
   const shakeClass = message.shouldShake ? "shake" : "";
@@ -502,7 +507,7 @@ const Message = ({ message }) => {
 
       return (
         <div id={`msg-${message._id}`} className={`chat ${chatClassName}`}>
-          <div className={`chat-image avatar ${message.audio ? "self-end pb-1" : ""}`}>
+          <div className={`chat-image avatar ${message.audio ? "self-end pb-1" : ""} ${isLastInGroup ? "" : "invisible"}`}>
             <div className="w-10 rounded-full bg-slate-700 flex items-center justify-center">
               <img
                 alt="Tailwind CSS chat bubble component"
@@ -514,9 +519,9 @@ const Message = ({ message }) => {
             </div>
           </div>
           <div
-            className={`chat-bubble text-white ${shakeClass} ${bubbleBgColor} ${highlightClass} ${
+            className={`chat-bubble text-white ${shakeClass} ${bubbleBgColor} ${highlightClass} max-w-[82%] md:max-w-[75%] ${
               message.audio
-                ? "w-[280px] sm:w-[300px] min-h-[78px] max-w-[85vw] sm:max-w-none p-3.5 pb-2 hover:bg-opacity-95"
+                ? "w-[280px] sm:w-[300px] min-h-[78px] p-3.5 pb-2 hover:bg-opacity-95"
                 : "pb-2.5 flex flex-col gap-2 " + (fromMe ? "pr-8" : "")
             } flex flex-col gap-2 relative group min-w-[90px] transition-all duration-300`}
             onMouseEnter={handleMouseEnter}

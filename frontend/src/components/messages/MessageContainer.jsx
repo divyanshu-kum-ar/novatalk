@@ -17,6 +17,7 @@ import toast from "react-hot-toast";
 const DEFAULT_AVATAR_GENERIC = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23a0aec0'><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z'/></svg>";
 const DEFAULT_AVATAR_MALE = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2363b3ed'><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z'/></svg>";
 const DEFAULT_AVATAR_FEMALE = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23f687b3'><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z'/></svg>";
+const DEFAULT_GROUP_AVATAR = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2338bdf8'><path d='M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z'/></svg>";
 
 const getDefaultAvatar = (gender) => {
   if (gender === "male") return DEFAULT_AVATAR_MALE;
@@ -278,7 +279,7 @@ const MessageContainer = () => {
   // Define avatar path for header
   const profilePicSrc = selectedConversation
     ? (isGroup
-      ? (selectedConversation.groupAvatar && selectedConversation.groupAvatar !== "" ? selectedConversation.groupAvatar : DEFAULT_AVATAR_GENERIC)
+      ? (selectedConversation.groupAvatar && selectedConversation.groupAvatar !== "" ? selectedConversation.groupAvatar : DEFAULT_GROUP_AVATAR)
       : ((selectedConversation.profilePic && !selectedConversation.profilePic.includes("avatar.iran.liara.run"))
         ? selectedConversation.profilePic
         : getDefaultAvatar(selectedConversation.gender)))
@@ -311,7 +312,7 @@ const MessageContainer = () => {
                     alt="Chat Avatar"
                     className="w-full h-full object-cover"
                     onError={(e) => {
-                      e.target.src = isGroup ? DEFAULT_AVATAR_GENERIC : getDefaultAvatar(selectedConversation.gender);
+                      e.target.src = isGroup ? DEFAULT_GROUP_AVATAR : getDefaultAvatar(selectedConversation.gender);
                     }}
                   />
                 </div>

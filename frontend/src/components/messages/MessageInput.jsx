@@ -701,7 +701,7 @@ const MessageInput = () => {
   };
 
   return (
-    <form className="px-4 pb-4 pt-2 sticky bottom-0 z-20 bg-transparent flex flex-col gap-2" onSubmit={handleSubmit}>
+    <form className="px-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-2 sticky bottom-0 z-20 bg-transparent flex flex-col gap-2" onSubmit={handleSubmit}>
       {editingMessage && (
         <div className="flex justify-between items-center bg-slate-900/90 border border-white/5 px-3 py-1.5 rounded-2xl text-xs text-gray-400 shadow-lg backdrop-blur-md animate-fadeIn">
           <span className="font-semibold text-sky-400">Editing message</span>
